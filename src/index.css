@@ -1,0 +1,25 @@
+@import "tailwindcss";
+
+@layer base {
+  .high-contrast {
+    filter: contrast(1.5) saturate(1.2);
+  }
+  .high-contrast .bg-white {
+    background-color: #ffffff !important;
+    border-color: #000000 !important;
+  }
+  .high-contrast .text-zinc-500, 
+  .high-contrast .text-zinc-400 {
+    color: #000000 !important;
+    font-weight: 600;
+  }
+  
+  .large-text {
+    font-size: 1.2rem;
+  }
+  .large-text h1 { font-size: 3rem !important; }
+  .large-text h2 { font-size: 2.5rem !important; }
+  .large-text h3 { font-size: 2rem !important; }
+  .large-text p { font-size: 1.1rem !important; }
+  .large-text button { font-size: 1.1rem !important; }
+}

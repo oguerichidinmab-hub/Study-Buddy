@@ -1,0 +1,8 @@
+{
+  "name": "Study Buddy",
+  "description": "An intelligent study planning app focused on academic performance and well-being, featuring AI timetables, focus modes, and collaborative study buddies.",
+  "requestFramePermissions": [
+    "notifications",
+    "contacts"
+  ]
+}

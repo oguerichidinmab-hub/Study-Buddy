@@ -1,0 +1,91 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile and study preferences",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "displayName": { "type": "string" },
+        "email": { "type": "string" },
+        "educationLevel": { "type": "string", "enum": ["Secondary", "University"] },
+        "targetExams": { "type": "array", "items": { "type": "string" } },
+        "strengths": { "type": "array", "items": { "type": "string" } },
+        "weaknesses": { "type": "array", "items": { "type": "string" } },
+        "availableHours": { "type": "number" },
+        "buddyType": { "type": "string", "enum": ["AI", "Friend"] },
+        "buddyId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email"]
+    },
+    "Schedule": {
+      "title": "Schedule",
+      "description": "AI-generated study plan for a user",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "blocks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "startTime": { "type": "string" },
+              "endTime": { "type": "string" },
+              "subject": { "type": "string" },
+              "type": { "type": "string", "enum": ["Study", "Break", "Rest"] },
+              "completed": { "type": "boolean" }
+            }
+          }
+        }
+      },
+      "required": ["userId", "date", "blocks"]
+    },
+    "StudySession": {
+      "title": "StudySession",
+      "description": "Log of a focus session",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "subject": { "type": "string" },
+        "durationMinutes": { "type": "number" },
+        "startTime": { "type": "string", "format": "date-time" },
+        "endTime": { "type": "string", "format": "date-time" },
+        "buddyId": { "type": "string" }
+      },
+      "required": ["userId", "subject", "durationMinutes", "startTime"]
+    },
+    "QuizResult": {
+      "title": "QuizResult",
+      "description": "Result of a practice quiz",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "subject": { "type": "string" },
+        "score": { "type": "number" },
+        "totalQuestions": { "type": "number" },
+        "date": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "subject", "score", "totalQuestions", "date"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "/schedules/{scheduleId}": {
+      "schema": "Schedule",
+      "description": "Study schedules"
+    },
+    "/studySessions/{sessionId}": {
+      "schema": "StudySession",
+      "description": "Focus session logs"
+    },
+    "/quizResults/{resultId}": {
+      "schema": "QuizResult",
+      "description": "Quiz performance tracking"
+    }
+  }
+}
