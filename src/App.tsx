@@ -15,7 +15,7 @@ import {
   BookOpen, Calendar, CheckCircle, Clock, LayoutDashboard, LogOut, 
   MessageSquare, Play, Plus, Settings, User as UserIcon, Zap, 
   Award, Brain, Coffee, Moon, Sun, Target, TrendingUp, X,
-  ChevronRight, ArrowLeft, RefreshCw, Sparkles, Volume2, Accessibility, Users, Info, Timer
+  ChevronRight, ArrowLeft, RefreshCw, Sparkles, Volume2, Accessibility, Users, Info, Timer, AlertTriangle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { UserProfile, Schedule, ScheduleBlock, StudySession, QuizResult } from './types';
@@ -284,6 +284,26 @@ export default function App() {
   const [activeQuiz, setActiveQuiz] = useState<any | null>(null);
   const [showBuddyEdit, setShowBuddyEdit] = useState(false);
   const [newSubject, setNewSubject] = useState('');
+
+  const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+  const isApiKeyMissing = !GEMINI_API_KEY || GEMINI_API_KEY === 'undefined';
+
+  if (isApiKeyMissing && !loading && isAuthReady) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-zinc-50 p-6">
+        <Card className="max-w-md w-full p-8 text-center">
+          <div className="w-16 h-16 bg-red-100 rounded-2xl flex items-center justify-center text-red-600 mx-auto mb-6">
+            <AlertTriangle size={32} />
+          </div>
+          <h2 className="text-2xl font-bold mb-4">Configuration Required</h2>
+          <p className="text-zinc-500 mb-6">
+            The Gemini API key is missing. If you are deploying to Vercel, please add <code>GEMINI_API_KEY</code> to your environment variables.
+          </p>
+          <Button className="w-full" onClick={() => window.location.reload()}>Retry</Button>
+        </Card>
+      </div>
+    );
+  }
 
   // --- Auth & Profile ---
 
