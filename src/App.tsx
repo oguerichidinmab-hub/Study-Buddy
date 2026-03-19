@@ -285,8 +285,8 @@ export default function App() {
   const [showBuddyEdit, setShowBuddyEdit] = useState(false);
   const [newSubject, setNewSubject] = useState('');
 
-  const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-  const isApiKeyMissing = !GEMINI_API_KEY || GEMINI_API_KEY === 'undefined';
+  const GEMINI_API_KEY = (typeof process !== 'undefined' && process.env) ? process.env.GEMINI_API_KEY : undefined;
+  const isApiKeyMissing = !GEMINI_API_KEY || GEMINI_API_KEY === 'undefined' || GEMINI_API_KEY === '';
 
   if (isApiKeyMissing && !loading && isAuthReady) {
     return (

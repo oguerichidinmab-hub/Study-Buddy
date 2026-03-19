@@ -1,9 +1,13 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { UserProfile, ScheduleBlock } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
+const getAI = () => {
+  const apiKey = (typeof process !== 'undefined' && process.env) ? process.env.GEMINI_API_KEY : '';
+  return new GoogleGenAI({ apiKey: apiKey || "" });
+};
 
 export async function generateTimetable(profile: UserProfile): Promise<ScheduleBlock[]> {
+  const ai = getAI();
   const prompt = `
     Generate a personalized study schedule for a ${profile.educationLevel} student.
     Target Exams: ${profile.targetExams.join(", ")}
@@ -52,6 +56,7 @@ export async function generateTimetable(profile: UserProfile): Promise<ScheduleB
 }
 
 export async function getBuddyMessage(profile: UserProfile, mood: string, progressContext: string = ""): Promise<string> {
+  const ai = getAI();
   const prompt = `
     You are "Ace", an AI Study Buddy for a student named ${profile.displayName}.
     The student is currently feeling: ${mood}.
@@ -75,6 +80,7 @@ export interface QuizQuestion {
 }
 
 export async function generateQuiz(subject: string, educationLevel: string, targetExams: string[] = []): Promise<QuizQuestion[]> {
+  const ai = getAI();
   const examContext = targetExams.length > 0 ? ` specifically for ${targetExams.join(", ")}` : "";
   const prompt = `
     Generate a 5-question multiple-choice quiz for a ${educationLevel} student on the subject: ${subject}${examContext}.
