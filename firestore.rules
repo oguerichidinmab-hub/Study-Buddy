@@ -68,7 +68,9 @@ service cloud.firestore {
              data.email is string && data.email.size() > 0 &&
              (!('displayName' in data) || (data.displayName is string && data.displayName.size() < 100)) &&
              (!('educationLevel' in data) || data.educationLevel in ['Secondary', 'University']) &&
-             (!('availableHours' in data) || (data.availableHours is number && data.availableHours >= 0 && data.availableHours <= 24));
+             (!('availableHours' in data) || (data.availableHours is number && data.availableHours >= 0 && data.availableHours <= 24)) &&
+             (!('subjects' in data) || (data.subjects is list && data.subjects.size() <= 20)) &&
+             (!('practiceGoals' in data) || (data.practiceGoals is list && data.practiceGoals.size() <= 20));
     }
 
     function isValidSchedule(data) {

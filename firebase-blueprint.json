@@ -15,6 +15,18 @@
         "availableHours": { "type": "number" },
         "buddyType": { "type": "string", "enum": ["AI", "Friend"] },
         "buddyId": { "type": "string" },
+        "subjects": { "type": "array", "items": { "type": "string" } },
+        "practiceGoals": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "subject": { "type": "string" },
+              "targetQuizzes": { "type": "number" },
+              "targetScore": { "type": "number" }
+            }
+          }
+        },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["uid", "email"]

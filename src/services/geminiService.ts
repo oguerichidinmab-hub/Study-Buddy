@@ -51,11 +51,12 @@ export async function generateTimetable(profile: UserProfile): Promise<ScheduleB
   }
 }
 
-export async function getBuddyMessage(profile: UserProfile, mood: string): Promise<string> {
+export async function getBuddyMessage(profile: UserProfile, mood: string, progressContext: string = ""): Promise<string> {
   const prompt = `
     You are "Ace", an AI Study Buddy for a student named ${profile.displayName}.
     The student is currently feeling: ${mood}.
     Current progress: ${profile.targetExams.join(", ")} preparation.
+    ${progressContext}
     Give a short, motivational, and supportive message (max 2 sentences).
   `;
 
@@ -73,9 +74,10 @@ export interface QuizQuestion {
   correctAnswer: number;
 }
 
-export async function generateQuiz(subject: string, educationLevel: string): Promise<QuizQuestion[]> {
+export async function generateQuiz(subject: string, educationLevel: string, targetExams: string[] = []): Promise<QuizQuestion[]> {
+  const examContext = targetExams.length > 0 ? ` specifically for ${targetExams.join(", ")}` : "";
   const prompt = `
-    Generate a 5-question multiple-choice quiz for a ${educationLevel} student on the subject: ${subject}.
+    Generate a 5-question multiple-choice quiz for a ${educationLevel} student on the subject: ${subject}${examContext}.
     Each question should have 4 options and a correct answer index (0-3).
     Return a list of objects with question, options (array), and correctAnswer (number).
   `;

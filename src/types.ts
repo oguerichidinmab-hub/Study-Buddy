@@ -1,3 +1,9 @@
+export interface PracticeGoal {
+  subject: string;
+  targetQuizzes: number;
+  targetScore: number;
+}
+
 export interface UserProfile {
   uid: string;
   displayName: string;
@@ -14,6 +20,7 @@ export interface UserProfile {
   buddyAlwaysPicksCalls?: boolean;
   buddyCaresAboutStudies?: boolean;
   subjects: string[];
+  practiceGoals?: PracticeGoal[];
   studyStartTime?: string;
   studyEndTime?: string;
   achievements: string[];

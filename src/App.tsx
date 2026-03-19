@@ -267,6 +267,9 @@ export default function App() {
   const [buddyMessage, setBuddyMessage] = useState<string>('Hey there! Ready to start our study session?');
   const [isBuddyLoading, setIsBuddyLoading] = useState(false);
   const [notifiedBlocks, setNotifiedBlocks] = useState<string[]>([]);
+  const [quizResults, setQuizResults] = useState<QuizResult[]>([]);
+  const [showGoalModal, setShowGoalModal] = useState<string | null>(null);
+  const [goalData, setGoalData] = useState({ targetQuizzes: 5, targetScore: 80 });
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
   const [isAddingSubject, setIsAddingSubject] = useState(false);
   const [accessibilitySettings, setAccessibilitySettings] = useState({
@@ -380,15 +383,24 @@ export default function App() {
   const fetchBuddyMessage = useCallback(async (mood: string) => {
     if (!profile) return;
     setIsBuddyLoading(true);
+    
+    // Calculate progress context
+    let progressContext = "";
+    if (profile.practiceGoals && profile.practiceGoals.length > 0) {
+      const topGoal = profile.practiceGoals[0];
+      const progress = getSubjectProgress(topGoal.subject);
+      progressContext = `The student has a goal for ${topGoal.subject}: ${progress.quizzes}/${topGoal.targetQuizzes} quizzes done, average score ${progress.score}%.`;
+    }
+
     try {
-      const msg = await getBuddyMessage(profile, mood);
+      const msg = await getBuddyMessage(profile, mood, progressContext);
       setBuddyMessage(msg);
     } catch (error) {
       console.error("Error fetching buddy message:", error);
     } finally {
       setIsBuddyLoading(false);
     }
-  }, [profile]);
+  }, [profile, quizResults]);
 
   useEffect(() => {
     if (profile && !buddyMessage) {
@@ -443,13 +455,14 @@ export default function App() {
 
   const handleAddSubject = async () => {
     if (!newSubject || !profile || !user) return;
-    if (profile.subjects.includes(newSubject)) {
+    const subjects = profile.subjects || [];
+    if (subjects.includes(newSubject)) {
       setToast({ title: 'Subject exists', message: 'This subject is already in your list.', type: 'warning' });
       return;
     }
     
     setIsAddingSubject(true);
-    const updatedSubjects = [...profile.subjects, newSubject];
+    const updatedSubjects = [...subjects, newSubject];
     try {
       await updateDoc(doc(db, 'users', user.uid), { subjects: updatedSubjects });
       setProfile({ ...profile, subjects: updatedSubjects });
@@ -464,7 +477,8 @@ export default function App() {
 
   const handleRemoveSubject = async (subject: string) => {
     if (!profile || !user) return;
-    const updatedSubjects = profile.subjects.filter(s => s !== subject);
+    const subjects = profile.subjects || [];
+    const updatedSubjects = subjects.filter(s => s !== subject);
     try {
       await updateDoc(doc(db, 'users', user.uid), { subjects: updatedSubjects });
       setProfile({ ...profile, subjects: updatedSubjects });
@@ -701,6 +715,41 @@ export default function App() {
     }
   };
 
+  const handleSetGoal = async () => {
+    if (!profile || !user || !showGoalModal) return;
+    const currentGoals = profile.practiceGoals || [];
+    const otherGoals = currentGoals.filter(g => g.subject !== showGoalModal);
+    const updatedGoals = [...otherGoals, { subject: showGoalModal, ...goalData }];
+    
+    try {
+      await updateDoc(doc(db, 'users', user.uid), { practiceGoals: updatedGoals });
+      setProfile({ ...profile, practiceGoals: updatedGoals });
+      setShowGoalModal(null);
+      setToast({ title: 'Goal Set', message: `Goal updated for ${showGoalModal}`, type: 'success' });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
+    }
+  };
+
+  const getSubjectProgress = (subject: string) => {
+    const goal = profile?.practiceGoals?.find(g => g.subject === subject);
+    if (!goal) return { quizzes: 0, score: 0, percent: 0 };
+    
+    const results = quizResults.filter(r => r.subject === subject);
+    const quizzesDone = results.length;
+    const avgScore = results.length > 0 
+      ? (results.reduce((acc, r) => acc + (r.score / r.totalQuestions), 0) / results.length) * 100 
+      : 0;
+    
+    const quizProgress = Math.min((quizzesDone / goal.targetQuizzes) * 100, 100);
+    const scoreProgress = goal.targetScore > 0 ? Math.min((avgScore / goal.targetScore) * 100, 100) : 0;
+    
+    return {
+      quizzes: quizzesDone,
+      score: Math.round(avgScore),
+      percent: Math.round((quizProgress + scoreProgress) / 2)
+    };
+  };
   const handleUpdateBuddy = async (buddyData: any) => {
     if (!profile || !user) return;
     try {
@@ -1062,32 +1111,73 @@ export default function App() {
               exit={{ opacity: 0, y: -10 }}
               className="space-y-8"
             >
-              <header>
-                <h2 className="text-2xl font-bold tracking-tight">Practice Center</h2>
-                <p className="text-zinc-500">Master your subjects with past questions and timed quizzes.</p>
+              <header className="flex justify-between items-end">
+                <div>
+                  <h2 className="text-2xl font-bold tracking-tight">Practice Center</h2>
+                  <p className="text-zinc-500">Master your subjects with exam-specific quizzes.</p>
+                </div>
+                {profile?.targetExams && profile.targetExams.length > 0 && (
+                  <div className="flex gap-2">
+                    {profile.targetExams.map(exam => (
+                      <Badge key={exam} color="violet">{exam}</Badge>
+                    ))}
+                  </div>
+                )}
               </header>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                {profile?.subjects?.map((subject) => (
-                  <Card key={subject} className="group hover:border-emerald-200 transition-all cursor-pointer">
-                    <div className="flex justify-between items-start mb-4">
-                      <div className="w-12 h-12 rounded-2xl bg-zinc-50 flex items-center justify-center text-zinc-400 group-hover:bg-emerald-50 group-hover:text-emerald-600 transition-colors">
-                        <BookOpen size={24} />
+                {profile?.subjects?.map((subject) => {
+                  const progress = getSubjectProgress(subject);
+                  const goal = profile.practiceGoals?.find(g => g.subject === subject);
+                  
+                  return (
+                    <Card key={subject} className="group hover:border-emerald-200 transition-all">
+                      <div className="flex justify-between items-start mb-4">
+                        <div className="w-12 h-12 rounded-2xl bg-zinc-50 flex items-center justify-center text-zinc-400 group-hover:bg-emerald-50 group-hover:text-emerald-600 transition-colors">
+                          <BookOpen size={24} />
+                        </div>
+                        <button 
+                          onClick={() => {
+                            setShowGoalModal(subject);
+                            if (goal) setGoalData({ targetQuizzes: goal.targetQuizzes, targetScore: goal.targetScore });
+                          }}
+                          className="text-[10px] font-bold text-emerald-600 hover:underline uppercase tracking-wider"
+                        >
+                          {goal ? 'Edit Goal' : 'Set Goal'}
+                        </button>
                       </div>
-                      <Badge color="zinc">AI Generated</Badge>
-                    </div>
-                    <h3 className="text-lg font-bold mb-1">{subject}</h3>
-                    <div className="flex items-center gap-2 mb-4">
-                      <div className="flex-1 h-1.5 bg-zinc-100 rounded-full overflow-hidden">
-                        <div className="h-full bg-emerald-500 w-[0%]" />
+                      <h3 className="text-lg font-bold mb-1">{subject}</h3>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">Overall Progress</span>
+                        <span className="text-[10px] font-bold text-emerald-600">{progress.percent}%</span>
                       </div>
-                      <span className="text-[10px] font-bold text-zinc-400">0%</span>
-                    </div>
-                    <Button variant="secondary" className="w-full text-xs py-2" icon={Play} onClick={() => setActiveQuiz({ subject })}>
-                      Start Practice
-                    </Button>
-                  </Card>
-                ))}
+                      <div className="h-1.5 bg-zinc-100 rounded-full overflow-hidden mb-4">
+                        <motion.div 
+                          initial={{ width: 0 }}
+                          animate={{ width: `${progress.percent}%` }}
+                          className="h-full bg-emerald-500" 
+                        />
+                      </div>
+                      
+                      {goal && (
+                        <div className="grid grid-cols-2 gap-4 mb-6 p-3 bg-zinc-50 rounded-xl border border-zinc-100">
+                          <div>
+                            <p className="text-[8px] text-zinc-400 font-bold uppercase mb-1">Quizzes</p>
+                            <p className="text-xs font-bold">{progress.quizzes} / {goal.targetQuizzes}</p>
+                          </div>
+                          <div>
+                            <p className="text-[8px] text-zinc-400 font-bold uppercase mb-1">Avg Score</p>
+                            <p className="text-xs font-bold">{progress.score}% / {goal.targetScore}%</p>
+                          </div>
+                        </div>
+                      )}
+
+                      <Button variant="secondary" className="w-full text-xs py-2" icon={Play} onClick={() => setActiveQuiz({ subject })}>
+                        Start Practice
+                      </Button>
+                    </Card>
+                  );
+                })}
                 {(!profile?.subjects || profile.subjects.length === 0) && (
                   <div className="col-span-full text-center py-12">
                     <p className="text-zinc-500">Add subjects in settings to start practicing.</p>
@@ -1140,10 +1230,28 @@ export default function App() {
                     <div className="space-y-6 mb-8">
                       <div className="bg-white/5 rounded-2xl p-4">
                         <p className="text-zinc-300 italic text-sm">
-                          {profile?.buddyType === 'AI' 
-                            ? `"You've completed 85% of your goals this week. I'm impressed, ${user.displayName?.split(' ')[0]}!"`
-                            : `Your ${profile?.buddyType.toLowerCase()} is here to support your learning journey.`}
+                          {isBuddyLoading ? "Ace is thinking..." : `"${buddyMessage}"`}
                         </p>
+                      </div>
+
+                      <div className="flex gap-3">
+                        <Button 
+                          className="flex-1 text-xs py-2" 
+                          variant="secondary" 
+                          icon={MessageSquare}
+                          onClick={() => fetchBuddyMessage('motivated')}
+                          disabled={isBuddyLoading}
+                        >
+                          Check-in
+                        </Button>
+                        <Button 
+                          className="flex-1 text-xs py-2" 
+                          icon={RefreshCw}
+                          onClick={() => fetchBuddyMessage('tired')}
+                          disabled={isBuddyLoading}
+                        >
+                          Get Advice
+                        </Button>
                       </div>
 
                       {profile?.buddyType !== 'AI' && (
@@ -1419,6 +1527,7 @@ export default function App() {
           <Quiz 
             subject={activeQuiz.subject} 
             educationLevel={profile?.educationLevel} 
+            targetExams={profile?.targetExams}
             onComplete={async (score: number, total: number) => {
               if (user) {
                 await addDoc(collection(db, 'quizResults'), {
@@ -1468,6 +1577,47 @@ export default function App() {
                 <p className="text-sm pt-4 border-t border-zinc-100">Version 1.0.0 • Designed for African Students</p>
               </div>
               <Button className="w-full mt-8" onClick={() => setShowAbout(false)}>Close</Button>
+            </Card>
+          </motion.div>
+        )}
+        {showGoalModal && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-6"
+          >
+            <Card className="max-w-sm w-full p-8">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-bold">Set Goal: {showGoalModal}</h3>
+                <button onClick={() => setShowGoalModal(null)} className="text-zinc-400 hover:text-zinc-600">
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="space-y-6">
+                <div>
+                  <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-2">Target Quizzes</label>
+                  <input 
+                    type="number" 
+                    value={goalData.targetQuizzes}
+                    onChange={(e) => setGoalData({ ...goalData, targetQuizzes: parseInt(e.target.value) })}
+                    className="w-full p-3 rounded-xl border border-zinc-100 focus:outline-none focus:border-emerald-600"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-2">Target Score (%)</label>
+                  <input 
+                    type="number" 
+                    value={goalData.targetScore}
+                    onChange={(e) => setGoalData({ ...goalData, targetScore: parseInt(e.target.value) })}
+                    className="w-full p-3 rounded-xl border border-zinc-100 focus:outline-none focus:border-emerald-600"
+                  />
+                </div>
+                <div className="flex gap-3 pt-4">
+                  <Button variant="secondary" className="flex-1" onClick={() => setShowGoalModal(null)}>Cancel</Button>
+                  <Button className="flex-1" onClick={handleSetGoal}>Save Goal</Button>
+                </div>
+              </div>
             </Card>
           </motion.div>
         )}
