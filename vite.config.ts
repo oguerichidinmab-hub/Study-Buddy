@@ -9,7 +9,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 export default defineConfig(({mode}) => {
-  const env = loadEnv(mode, '.', '');
+  const env = loadEnv(mode, process.cwd(), '');
+  const geminiKey = env.GEMINI_API_KEY || process.env.GEMINI_API_KEY || '';
+
   return {
     plugins: [
       react(), 
@@ -19,14 +21,16 @@ export default defineConfig(({mode}) => {
         injectRegister: 'auto',
         includeAssets: ['mask-icon.svg'],
         manifest: {
-          name: 'Study Buddy',
+          name: 'Study Buddy | AI Academic Companion',
           short_name: 'StudyBuddy',
-          description: 'Your AI-powered academic companion',
+          description: 'Your AI-powered academic companion for focused study and exam preparation.',
           theme_color: '#059669',
+          background_color: '#ffffff',
+          display: 'standalone',
           icons: [
             {
               src: 'mask-icon.svg',
-              sizes: 'any',
+              sizes: '512x512',
               type: 'image/svg+xml',
               purpose: 'any maskable'
             }
@@ -35,7 +39,7 @@ export default defineConfig(({mode}) => {
       })
     ],
     define: {
-      'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
+      'import.meta.env.GEMINI_API_KEY': JSON.stringify(geminiKey),
     },
     resolve: {
       alias: {

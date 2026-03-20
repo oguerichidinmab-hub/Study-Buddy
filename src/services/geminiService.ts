@@ -2,7 +2,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { UserProfile, ScheduleBlock } from "../types";
 
 const getAI = () => {
-  const apiKey = (typeof process !== 'undefined' && process.env) ? process.env.GEMINI_API_KEY : '';
+  const apiKey = import.meta.env.GEMINI_API_KEY || '';
   return new GoogleGenAI({ apiKey: apiKey || "" });
 };
 

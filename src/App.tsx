@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, Component, ReactNode } from 'react';
 import { 
   auth, db, googleProvider, signInWithPopup, onAuthStateChanged, User, 
   handleFirestoreError, OperationType 
@@ -17,7 +17,7 @@ import {
   Award, Brain, Coffee, Moon, Sun, Target, TrendingUp, X,
   ChevronRight, ArrowLeft, RefreshCw, Sparkles, Volume2, Accessibility, Users, Info, Timer, AlertTriangle
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { UserProfile, Schedule, ScheduleBlock, StudySession, QuizResult } from './types';
 import { generateTimetable, getBuddyMessage, generateQuiz } from './services/geminiService';
 
@@ -285,7 +285,7 @@ export default function App() {
   const [showBuddyEdit, setShowBuddyEdit] = useState(false);
   const [newSubject, setNewSubject] = useState('');
 
-  const GEMINI_API_KEY = (typeof process !== 'undefined' && process.env) ? process.env.GEMINI_API_KEY : undefined;
+  const GEMINI_API_KEY = import.meta.env.GEMINI_API_KEY || '';
   const isApiKeyMissing = !GEMINI_API_KEY || GEMINI_API_KEY === 'undefined' || GEMINI_API_KEY === '';
 
   if (isApiKeyMissing && !loading && isAuthReady) {

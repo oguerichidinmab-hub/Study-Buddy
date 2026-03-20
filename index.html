@@ -11,6 +11,14 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      window.onerror = function(message, source, lineno, colno, error) {
+        console.error('Global Error:', message, 'at', source, ':', lineno, ':', colno, error);
+      };
+      window.onunhandledrejection = function(event) {
+        console.error('Unhandled Rejection:', event.reason);
+      };
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
