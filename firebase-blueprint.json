@@ -1,43 +1,50 @@
 {
   "entities": {
-    "User": {
-      "title": "User",
+    "UserProfile": {
+      "title": "UserProfile",
       "description": "User profile and study preferences",
       "type": "object",
       "properties": {
         "uid": { "type": "string" },
         "displayName": { "type": "string" },
-        "email": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
         "educationLevel": { "type": "string", "enum": ["Secondary", "University"] },
         "targetExams": { "type": "array", "items": { "type": "string" } },
         "strengths": { "type": "array", "items": { "type": "string" } },
         "weaknesses": { "type": "array", "items": { "type": "string" } },
         "availableHours": { "type": "number" },
-        "buddyType": { "type": "string", "enum": ["AI", "Friend"] },
+        "buddyType": { "type": "string", "enum": ["AI", "Contact", "Guardian", "AppUser"] },
+        "buddyName": { "type": "string" },
         "buddyId": { "type": "string" },
+        "buddyRating": { "type": "number" },
+        "buddyAlwaysPicksCalls": { "type": "boolean" },
+        "buddyCaresAboutStudies": { "type": "boolean" },
         "subjects": { "type": "array", "items": { "type": "string" } },
-        "practiceGoals": {
-          "type": "array",
-          "items": {
+        "practiceGoals": { 
+          "type": "array", 
+          "items": { 
             "type": "object",
             "properties": {
               "subject": { "type": "string" },
               "targetQuizzes": { "type": "number" },
               "targetScore": { "type": "number" }
             }
-          }
+          } 
         },
+        "studyStartTime": { "type": "string" },
+        "studyEndTime": { "type": "string" },
+        "achievements": { "type": "array", "items": { "type": "string" } },
         "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["uid", "email"]
+      "required": ["uid", "displayName", "email", "educationLevel", "targetExams", "strengths", "weaknesses", "availableHours", "buddyType", "subjects", "achievements", "createdAt"]
     },
     "Schedule": {
       "title": "Schedule",
-      "description": "AI-generated study plan for a user",
+      "description": "Daily study schedule for a user",
       "type": "object",
       "properties": {
         "userId": { "type": "string" },
-        "date": { "type": "string", "format": "date" },
+        "date": { "type": "string" },
         "blocks": {
           "type": "array",
           "items": {
@@ -48,7 +55,8 @@
               "subject": { "type": "string" },
               "type": { "type": "string", "enum": ["Study", "Break", "Rest"] },
               "completed": { "type": "boolean" }
-            }
+            },
+            "required": ["startTime", "endTime", "subject", "type", "completed"]
           }
         }
       },
@@ -56,7 +64,7 @@
     },
     "StudySession": {
       "title": "StudySession",
-      "description": "Log of a focus session",
+      "description": "A recorded study session",
       "type": "object",
       "properties": {
         "userId": { "type": "string" },
@@ -70,7 +78,7 @@
     },
     "QuizResult": {
       "title": "QuizResult",
-      "description": "Result of a practice quiz",
+      "description": "Result of a completed quiz",
       "type": "object",
       "properties": {
         "userId": { "type": "string" },
@@ -84,20 +92,20 @@
   },
   "firestore": {
     "/users/{userId}": {
-      "schema": "User",
-      "description": "User profiles"
+      "schema": "UserProfile",
+      "description": "User profile data"
     },
     "/schedules/{scheduleId}": {
       "schema": "Schedule",
-      "description": "Study schedules"
+      "description": "User study schedules"
     },
-    "/studySessions/{sessionId}": {
+    "/sessions/{sessionId}": {
       "schema": "StudySession",
-      "description": "Focus session logs"
+      "description": "User study sessions"
     },
     "/quizResults/{resultId}": {
       "schema": "QuizResult",
-      "description": "Quiz performance tracking"
+      "description": "User quiz results"
     }
   }
 }

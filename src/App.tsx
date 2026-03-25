@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useCallback, useRef, Component, ReactNode } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   auth, db, googleProvider, signInWithPopup, onAuthStateChanged, User, 
   handleFirestoreError, OperationType 
@@ -339,7 +339,20 @@ export default function App() {
       }
       setLoading(false);
     });
-    return unsubscribe;
+
+    // Safety timeout: if auth doesn't respond in 10s, stop loading
+    const timeout = setTimeout(() => {
+      if (loading) {
+        console.warn('Auth state timeout reached');
+        setLoading(false);
+        setIsAuthReady(true);
+      }
+    }, 10000);
+
+    return () => {
+      unsubscribe();
+      clearTimeout(timeout);
+    };
   }, []);
 
   const handleLogin = async () => {
@@ -785,13 +798,21 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-zinc-50">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-zinc-50 p-6">
         <motion.div 
           animate={{ rotate: 360 }}
           transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
+          className="mb-6"
         >
-          <RefreshCw className="text-emerald-600" size={32} />
+          <RefreshCw className="text-emerald-600" size={48} />
         </motion.div>
+        <h2 className="text-xl font-bold text-zinc-900 mb-2">Loading Study Buddy...</h2>
+        <p className="text-zinc-500 text-center max-w-xs">
+          {!isAuthReady ? "Initializing authentication..." : "Fetching your profile..."}
+        </p>
+        <div className="mt-8 text-xs text-zinc-400">
+          Status: {JSON.stringify({ isAuthReady, hasUser: !!user, hasProfile: !!profile })}
+        </div>
       </div>
     );
   }

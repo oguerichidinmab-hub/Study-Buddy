@@ -1,56 +1,58 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
     // ===============================================================
     // Assumed Data Model
     // ===============================================================
     //
     // Collection: users
-    // Document ID: userId
+    // Document ID: {userId} (matches request.auth.uid)
     // Fields:
     //   - uid: string (required)
-    //   - displayName: string
-    //   - email: string (required)
-    //   - educationLevel: string
-    //   - targetExams: list
-    //   - strengths: list
-    //   - weaknesses: list
-    //   - availableHours: number
-    //   - buddyType: string
-    //   - buddyId: string
-    //   - createdAt: timestamp
+    //   - displayName: string (required, < 100 chars)
+    //   - email: string (required, email format)
+    //   - educationLevel: string (required, enum: Secondary, University)
+    //   - targetExams: list (required, strings)
+    //   - strengths: list (required, strings)
+    //   - weaknesses: list (required, strings)
+    //   - availableHours: number (required, 0-24)
+    //   - buddyType: string (required, enum: AI, Contact, Guardian, AppUser)
+    //   - subjects: list (required, strings)
+    //   - achievements: list (required, strings)
+    //   - createdAt: string (required, date-time)
     //
     // Collection: schedules
-    // Document ID: scheduleId
+    // Document ID: auto-generated
     // Fields:
-    //   - userId: string (required)
-    //   - date: string (required)
-    //   - blocks: list (required)
+    //   - userId: string (required, matches request.auth.uid)
+    //   - date: string (required, YYYY-MM-DD)
+    //   - blocks: list (required, objects with startTime, endTime, subject, type, completed)
     //
-    // Collection: studySessions
-    // Document ID: sessionId
+    // Collection: sessions
+    // Document ID: auto-generated
     // Fields:
-    //   - userId: string (required)
+    //   - userId: string (required, matches request.auth.uid)
     //   - subject: string (required)
-    //   - durationMinutes: number (required)
-    //   - startTime: timestamp (required)
-    //   - endTime: timestamp
-    //   - buddyId: string
+    //   - durationMinutes: number (required, > 0)
+    //   - startTime: string (required, date-time)
+    //   - endTime: string (optional, date-time)
     //
     // Collection: quizResults
-    // Document ID: resultId
+    // Document ID: auto-generated
     // Fields:
-    //   - userId: string (required)
+    //   - userId: string (required, matches request.auth.uid)
     //   - subject: string (required)
-    //   - score: number (required)
-    //   - totalQuestions: number (required)
-    //   - date: timestamp (required)
+    //   - score: number (required, >= 0)
+    //   - totalQuestions: number (required, > 0)
+    //   - date: string (required, date-time)
     //
     // ===============================================================
 
     // ===============================================================
     // Helper Functions
     // ===============================================================
+
     function isAuthenticated() {
       return request.auth != null;
     }
@@ -63,33 +65,75 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == resource.data.userId;
     }
 
+    function isRequestOwner() {
+      return isAuthenticated() && request.auth.uid == request.resource.data.userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "oguerichidinmab@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidDateString(dateStr) {
+      return dateStr is string && dateStr.matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.*Z?$");
+    }
+
+    function isValidSimpleDate(dateStr) {
+      return dateStr is string && dateStr.matches("^\\d{4}-\\d{2}-\\d{2}$");
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
     function isValidUser(data) {
-      return data.uid is string && data.uid.size() > 0 &&
-             data.email is string && data.email.size() > 0 &&
-             (!('displayName' in data) || (data.displayName is string && data.displayName.size() < 100)) &&
-             (!('educationLevel' in data) || data.educationLevel in ['Secondary', 'University']) &&
-             (!('availableHours' in data) || (data.availableHours is number && data.availableHours >= 0 && data.availableHours <= 24)) &&
-             (!('subjects' in data) || (data.subjects is list && data.subjects.size() <= 20)) &&
-             (!('practiceGoals' in data) || (data.practiceGoals is list && data.practiceGoals.size() <= 20));
+      return hasRequiredFields(['uid', 'displayName', 'email', 'educationLevel', 'targetExams', 'strengths', 'weaknesses', 'availableHours', 'buddyType', 'subjects', 'achievements', 'createdAt']) &&
+             data.uid == request.auth.uid &&
+             data.displayName is string && data.displayName.size() > 0 && data.displayName.size() < 100 &&
+             isValidEmail(data.email) &&
+             data.educationLevel in ['Secondary', 'University'] &&
+             data.availableHours is number && data.availableHours >= 0 && data.availableHours <= 24 &&
+             data.buddyType in ['AI', 'Contact', 'Guardian', 'AppUser'] &&
+             data.subjects is list &&
+             data.achievements is list &&
+             isValidDateString(data.createdAt);
     }
 
     function isValidSchedule(data) {
-      return data.userId is string && data.userId == request.auth.uid &&
-             data.date is string &&
-             data.blocks is list && data.blocks.size() <= 50;
+      return hasRequiredFields(['userId', 'date', 'blocks']) &&
+             data.userId == request.auth.uid &&
+             isValidSimpleDate(data.date) &&
+             data.blocks is list && data.blocks.size() < 50;
     }
 
-    function isValidStudySession(data) {
-      return data.userId is string && data.userId == request.auth.uid &&
-             data.subject is string && data.subject.size() > 0 &&
-             data.durationMinutes is number && data.durationMinutes >= 0;
+    function isValidSession(data) {
+      return hasRequiredFields(['userId', 'subject', 'durationMinutes', 'startTime']) &&
+             data.userId == request.auth.uid &&
+             data.subject is string && data.subject.size() > 0 && data.subject.size() < 100 &&
+             data.durationMinutes is number && data.durationMinutes >= 0 &&
+             isValidDateString(data.startTime);
     }
 
     function isValidQuizResult(data) {
-      return data.userId is string && data.userId == request.auth.uid &&
-             data.subject is string && data.subject.size() > 0 &&
+      return hasRequiredFields(['userId', 'subject', 'score', 'totalQuestions', 'date']) &&
+             data.userId == request.auth.uid &&
+             data.subject is string && data.subject.size() > 0 && data.subject.size() < 100 &&
              data.score is number && data.score >= 0 &&
-             data.totalQuestions is number && data.totalQuestions > 0;
+             data.totalQuestions is number && data.totalQuestions > 0 &&
+             isValidDateString(data.date);
     }
 
     // ===============================================================
@@ -97,34 +141,36 @@ service cloud.firestore {
     // ===============================================================
 
     match /users/{userId} {
-      allow read: if isOwner(userId);
+      allow read: if isOwner(userId) || isAdmin();
       allow create: if isOwner(userId) && isValidUser(request.resource.data);
-      allow update: if isOwner(userId) && isValidUser(request.resource.data);
+      allow update: if isOwner(userId) && isValidUser(request.resource.data) && 
+                    request.resource.data.uid == resource.data.uid &&
+                    request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if isAdmin();
     }
 
     match /schedules/{scheduleId} {
-      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid);
-      allow create: if isAuthenticated() && isValidSchedule(request.resource.data);
-      allow update: if isAuthenticated() && isDocOwner() && isValidSchedule(request.resource.data);
-      allow delete: if isAuthenticated() && isDocOwner();
+      allow read: if isDocOwner() || isAdmin();
+      allow create: if isRequestOwner() && isValidSchedule(request.resource.data);
+      allow update: if isDocOwner() && isRequestOwner() && isValidSchedule(request.resource.data) &&
+                    request.resource.data.userId == resource.data.userId;
+      allow delete: if isDocOwner() || isAdmin();
     }
 
-    match /studySessions/{sessionId} {
-      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid);
-      allow create: if isAuthenticated() && isValidStudySession(request.resource.data);
-      allow update: if isAuthenticated() && isDocOwner() && isValidStudySession(request.resource.data);
-      allow delete: if isAuthenticated() && isDocOwner();
+    match /sessions/{sessionId} {
+      allow read: if isDocOwner() || isAdmin();
+      allow create: if isRequestOwner() && isValidSession(request.resource.data);
+      allow update: if isDocOwner() && isRequestOwner() && isValidSession(request.resource.data) &&
+                    request.resource.data.userId == resource.data.userId;
+      allow delete: if isDocOwner() || isAdmin();
     }
 
     match /quizResults/{resultId} {
-      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid);
-      allow create: if isAuthenticated() && isValidQuizResult(request.resource.data);
-      allow update: if isAuthenticated() && isDocOwner() && isValidQuizResult(request.resource.data);
-      allow delete: if isAuthenticated() && isDocOwner();
-    }
-
-    match /test/connection {
-      allow read: if true;
+      allow read: if isDocOwner() || isAdmin();
+      allow create: if isRequestOwner() && isValidQuizResult(request.resource.data);
+      allow update: if isDocOwner() && isRequestOwner() && isValidQuizResult(request.resource.data) &&
+                    request.resource.data.userId == resource.data.userId;
+      allow delete: if isDocOwner() || isAdmin();
     }
 
     // Default deny
