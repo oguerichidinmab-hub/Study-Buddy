@@ -6,7 +6,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   auth, db, googleProvider, signInWithPopup, onAuthStateChanged, User, 
-  handleFirestoreError, OperationType 
+  handleFirestoreError, OperationType, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut 
 } from './firebase';
 import { 
   doc, getDoc, setDoc, updateDoc, collection, query, where, onSnapshot, addDoc, serverTimestamp, Timestamp 
@@ -284,6 +284,10 @@ export default function App() {
   const [activeQuiz, setActiveQuiz] = useState<any | null>(null);
   const [showBuddyEdit, setShowBuddyEdit] = useState(false);
   const [newSubject, setNewSubject] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   const GEMINI_API_KEY = import.meta.env.GEMINI_API_KEY || '';
   const isApiKeyMissing = !GEMINI_API_KEY || GEMINI_API_KEY === 'undefined' || GEMINI_API_KEY === '';
@@ -356,14 +360,33 @@ export default function App() {
   }, []);
 
   const handleLogin = async () => {
+    setAuthError(null);
     try {
       await signInWithPopup(auth, googleProvider);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Login failed:', error);
+      setAuthError(error.message);
     }
   };
 
-  const handleLogout = () => auth.signOut();
+  const handleEmailAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError(null);
+    setLoading(true);
+    try {
+      if (isSignUp) {
+        await createUserWithEmailAndPassword(auth, email, password);
+      } else {
+        await signInWithEmailAndPassword(auth, email, password);
+      }
+    } catch (error: any) {
+      console.error('Email auth failed:', error);
+      setAuthError(error.message);
+      setLoading(false);
+    }
+  };
+
+  const handleLogout = () => signOut(auth);
 
   // --- Real-time Listeners ---
 
@@ -832,9 +855,59 @@ export default function App() {
           <p className="text-zinc-600 mb-10 text-lg">
             Your intelligent companion for academic excellence and balanced well-being.
           </p>
-          <Button onClick={handleLogin} className="w-full py-4 text-lg" icon={Zap}>
-            Get Started with Google
-          </Button>
+          
+          <Card className="p-6 mb-6 text-left">
+            <h2 className="text-xl font-bold mb-4">{isSignUp ? 'Create Account' : 'Welcome Back'}</h2>
+            <form onSubmit={handleEmailAuth} className="space-y-4">
+              <div>
+                <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-2">Email Address</label>
+                <input 
+                  type="email" 
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="name@example.com"
+                  className="w-full p-3 rounded-xl border border-zinc-100 text-sm focus:outline-none focus:border-emerald-600"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-2">Password</label>
+                <input 
+                  type="password" 
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full p-3 rounded-xl border border-zinc-100 text-sm focus:outline-none focus:border-emerald-600"
+                  required
+                />
+              </div>
+              {authError && (
+                <p className="text-xs text-red-500 font-medium">{authError}</p>
+              )}
+              <Button type="submit" className="w-full py-3" disabled={loading}>
+                {loading ? 'Processing...' : (isSignUp ? 'Sign Up' : 'Sign In')}
+              </Button>
+            </form>
+            
+            <div className="mt-6 flex flex-col gap-3">
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-zinc-100"></span></div>
+                <div className="relative flex justify-center text-xs uppercase"><span className="bg-white px-2 text-zinc-400">Or continue with</span></div>
+              </div>
+              
+              <Button variant="secondary" onClick={handleLogin} className="w-full py-3" icon={Zap}>
+                Google Account
+              </Button>
+            </div>
+          </Card>
+
+          <button 
+            onClick={() => setIsSignUp(!isSignUp)}
+            className="text-sm text-emerald-600 font-bold hover:underline"
+          >
+            {isSignUp ? 'Already have an account? Sign In' : "Don't have an account? Sign Up"}
+          </button>
+
           <p className="mt-8 text-xs text-zinc-400 uppercase tracking-widest font-bold">
             Designed for African Students
           </p>
