@@ -289,9 +289,6 @@ export default function App() {
   const [isSignUp, setIsSignUp] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
-  const GEMINI_API_KEY = import.meta.env.GEMINI_API_KEY || '';
-  const isApiKeyMissing = !GEMINI_API_KEY || GEMINI_API_KEY === 'undefined' || GEMINI_API_KEY === '';
-
   // --- Auth & Profile ---
 
   useEffect(() => {
@@ -801,23 +798,6 @@ export default function App() {
   };
 
   // --- Views ---
-
-  if (isApiKeyMissing && !loading && isAuthReady) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-zinc-50 p-6">
-        <Card className="max-w-md w-full p-8 text-center">
-          <div className="w-16 h-16 bg-red-100 rounded-2xl flex items-center justify-center text-red-600 mx-auto mb-6">
-            <AlertTriangle size={32} />
-          </div>
-          <h2 className="text-2xl font-bold mb-4">Configuration Required</h2>
-          <p className="text-zinc-500 mb-6">
-            The Gemini API key is missing. If you are deploying to Vercel, please add <code>GEMINI_API_KEY</code> to your environment variables.
-          </p>
-          <Button className="w-full" onClick={() => window.location.reload()}>Retry</Button>
-        </Card>
-      </div>
-    );
-  }
 
   if (loading) {
     return (
