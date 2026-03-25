@@ -52,10 +52,24 @@ export interface StudySession {
   buddyId?: string;
 }
 
+export interface ExamQuestion {
+  id: string;
+  subject: string;
+  year?: number;
+  examType: 'JAMB' | 'WAEC' | 'NECO' | 'POST-UTME' | 'General';
+  question: string;
+  options: string[];
+  correctAnswer: number;
+  explanation: string;
+  sourceType: 'original' | 'licensed' | 'user_uploaded';
+  difficulty?: 'Easy' | 'Medium' | 'Hard';
+}
+
 export interface QuizResult {
   id?: string;
   userId: string;
   subject: string;
+  examType?: string;
   score: number;
   totalQuestions: number;
   date: string;

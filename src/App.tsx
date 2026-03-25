@@ -15,11 +15,12 @@ import {
   BookOpen, Calendar, CheckCircle, Clock, LayoutDashboard, LogOut, 
   MessageSquare, Play, Plus, Settings, User as UserIcon, Zap, 
   Award, Brain, Coffee, Moon, Sun, Target, TrendingUp, X,
-  ChevronRight, ArrowLeft, RefreshCw, Sparkles, Volume2, Accessibility, Users, Info, Timer, AlertTriangle
+  ChevronRight, ArrowLeft, RefreshCw, Sparkles, Volume2, Accessibility, Users, Info, Timer, AlertTriangle, ExternalLink
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { UserProfile, Schedule, ScheduleBlock, StudySession, QuizResult } from './types';
+import { UserProfile, Schedule, ScheduleBlock, StudySession, QuizResult, ExamQuestion } from './types';
 import { generateTimetable, getBuddyMessage, generateQuiz } from './services/geminiService';
+import { PRACTICE_QUESTIONS } from './data/practiceQuestions';
 
 // --- Components ---
 
@@ -299,6 +300,244 @@ const EditBuddyModal = ({ profile, onSave, onCancel }: any) => {
     );
   };
 
+const ExamPractice = ({ onCancel, onComplete }: { onCancel: () => void, onComplete: (score: number, total: number, subject: string, examType: string) => void }) => {
+  const [selectedExamType, setSelectedExamType] = useState<string | null>(null);
+  const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
+  const [selectedYear, setSelectedYear] = useState<number | null>(null);
+  const [questions, setQuestions] = useState<ExamQuestion[]>([]);
+  const [currentIdx, setCurrentIdx] = useState(0);
+  const [userAnswers, setUserAnswers] = useState<(number | null)[]>([]);
+  const [showExplanation, setShowExplanation] = useState(false);
+  const [finished, setFinished] = useState(false);
+
+  const examTypes = Array.from(new Set(PRACTICE_QUESTIONS.map(q => q.examType)));
+  const subjects = Array.from(new Set(PRACTICE_QUESTIONS.filter(q => !selectedExamType || q.examType === selectedExamType).map(q => q.subject)));
+  const years = Array.from(new Set(PRACTICE_QUESTIONS.filter(q => (!selectedExamType || q.examType === selectedExamType) && (!selectedSubject || q.subject === selectedSubject)).map(q => q.year))).filter(y => y !== undefined).sort((a, b) => (b as number) - (a as number));
+
+  const startPractice = () => {
+    let filtered = PRACTICE_QUESTIONS;
+    if (selectedExamType) filtered = filtered.filter(q => q.examType === selectedExamType);
+    if (selectedSubject) filtered = filtered.filter(q => q.subject === selectedSubject);
+    if (selectedYear) filtered = filtered.filter(q => q.year === selectedYear);
+    
+    if (filtered.length === 0) {
+      alert("No questions found for this selection.");
+      return;
+    }
+
+    // Shuffle and pick 10 questions
+    const shuffled = [...filtered].sort(() => 0.5 - Math.random()).slice(0, 10);
+
+    setQuestions(shuffled);
+    setUserAnswers(new Array(shuffled.length).fill(null));
+    setCurrentIdx(0);
+    setShowExplanation(false);
+    setFinished(false);
+  };
+
+  const handleAnswer = (optionIdx: number) => {
+    if (finished) return;
+    const newAnswers = [...userAnswers];
+    newAnswers[currentIdx] = optionIdx;
+    setUserAnswers(newAnswers);
+    setShowExplanation(true);
+  };
+
+  const nextQuestion = () => {
+    if (currentIdx < questions.length - 1) {
+      setCurrentIdx(currentIdx + 1);
+      setShowExplanation(userAnswers[currentIdx + 1] !== null);
+    } else {
+      setFinished(true);
+    }
+  };
+
+  const prevQuestion = () => {
+    if (currentIdx > 0) {
+      setCurrentIdx(currentIdx - 1);
+      setShowExplanation(true);
+    }
+  };
+
+  const score = userAnswers.reduce((acc, ans, idx) => {
+    return ans === questions[idx]?.correctAnswer ? acc + 1 : acc;
+  }, 0);
+
+  if (questions.length > 0 && !finished) {
+    const q = questions[currentIdx];
+    const hasAnswered = userAnswers[currentIdx] !== null;
+
+    return (
+      <div className="fixed inset-0 bg-white z-[110] flex flex-col p-6 overflow-y-auto">
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <Badge color="violet">{q.examType} Practice</Badge>
+            <h3 className="text-lg font-bold mt-1">{q.subject} {q.year ? `(${q.year})` : ''}</h3>
+          </div>
+          <button onClick={onCancel} className="p-2 hover:bg-zinc-100 rounded-full transition-colors flex items-center gap-2 text-zinc-500 font-bold text-xs">
+            <X size={20} /> Quit
+          </button>
+        </div>
+
+        <div className="flex-1 max-w-2xl mx-auto w-full pb-24">
+          <div className="flex justify-between items-center mb-4">
+            <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Question {currentIdx + 1} of {questions.length}</p>
+            <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">Score: {score}</p>
+          </div>
+
+          <h4 className="text-xl font-bold mb-8 leading-tight">{q.question}</h4>
+          
+          <div className="space-y-3">
+            {q.options.map((opt, idx) => {
+              let style = "border-zinc-100";
+              if (hasAnswered) {
+                if (idx === q.correctAnswer) style = "border-emerald-500 bg-emerald-50 text-emerald-700";
+                else if (idx === userAnswers[currentIdx]) style = "border-red-500 bg-red-50 text-red-700";
+                else style = "opacity-50";
+              }
+
+              return (
+                <button 
+                  key={idx}
+                  disabled={hasAnswered}
+                  onClick={() => handleAnswer(idx)}
+                  className={`w-full p-4 text-left rounded-2xl border transition-all flex items-center gap-4 ${style} ${!hasAnswered ? 'hover:border-emerald-600 hover:bg-emerald-50' : ''}`}
+                >
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold ${hasAnswered && idx === q.correctAnswer ? 'bg-emerald-600 text-white' : 'bg-zinc-50 text-zinc-400'}`}>
+                    {String.fromCharCode(65 + idx)}
+                  </div>
+                  <span className="font-medium">{opt}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {showExplanation && (
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-8 p-4 bg-zinc-50 rounded-2xl border border-zinc-100">
+              <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-2">Explanation</p>
+              <p className="text-sm text-zinc-600 leading-relaxed">{q.explanation}</p>
+            </motion.div>
+          )}
+        </div>
+
+        <div className="fixed bottom-0 left-0 right-0 p-6 bg-white border-t border-zinc-100 flex gap-3">
+          <Button variant="secondary" className="flex-1" onClick={prevQuestion} disabled={currentIdx === 0} icon={ArrowLeft}>Back</Button>
+          <Button className="flex-1" onClick={nextQuestion} icon={ChevronRight}>
+            {currentIdx === questions.length - 1 ? 'Finish' : 'Next'}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (finished) {
+    return (
+      <div className="fixed inset-0 bg-white z-[110] flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-20 h-20 bg-emerald-100 rounded-3xl flex items-center justify-center text-emerald-600 mb-6">
+          <Award size={40} />
+        </div>
+        <h2 className="text-3xl font-bold mb-2">Practice Complete!</h2>
+        <p className="text-zinc-500 mb-8">You scored {score} out of {questions.length}</p>
+        <div className="flex gap-3 w-full max-w-xs">
+          <Button className="flex-1" onClick={() => { setQuestions([]); setFinished(false); }}>Retry</Button>
+          <Button variant="secondary" className="flex-1" onClick={() => onComplete(score, questions.length, questions[0].subject, questions[0].examType)}>Finish</Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 bg-white z-[110] flex flex-col p-6 overflow-y-auto">
+      <div className="flex justify-between items-center mb-8">
+        <div className="flex items-center gap-3">
+          {(selectedExamType || selectedSubject) && (
+            <button 
+              onClick={() => {
+                if (selectedSubject) setSelectedSubject(null);
+                else if (selectedExamType) setSelectedExamType(null);
+              }}
+              className="p-2 hover:bg-zinc-100 rounded-full transition-colors"
+            >
+              <ArrowLeft size={20} />
+            </button>
+          )}
+          <h2 className="text-2xl font-bold tracking-tight">Exam Practice</h2>
+        </div>
+        <button onClick={onCancel} className="p-2 hover:bg-zinc-100 rounded-full transition-colors">
+          <X size={20} />
+        </button>
+      </div>
+
+      <div className="space-y-8 max-w-md mx-auto w-full pb-12">
+        {!selectedExamType ? (
+          <div>
+            <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-3">Select Exam Type</label>
+            <div className="grid grid-cols-1 gap-2">
+              {examTypes.map(type => (
+                <button 
+                  key={type}
+                  onClick={() => setSelectedExamType(type)}
+                  className="p-4 rounded-2xl border border-zinc-100 text-left hover:border-emerald-600 hover:bg-emerald-50 transition-all flex justify-between items-center"
+                >
+                  <span className="font-bold">{type}</span>
+                  <ChevronRight size={18} className="text-zinc-400" />
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : !selectedSubject ? (
+          <div>
+            <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-3">Select Subject for {selectedExamType}</label>
+            <div className="grid grid-cols-1 gap-2">
+              {subjects.map(s => (
+                <button 
+                  key={s}
+                  onClick={() => setSelectedSubject(s)}
+                  className="p-4 rounded-2xl border border-zinc-100 text-left hover:border-emerald-600 hover:bg-emerald-50 transition-all flex justify-between items-center"
+                >
+                  <span className="font-bold">{s}</span>
+                  <ChevronRight size={18} className="text-zinc-400" />
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <>
+            <div>
+              <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-3">Select Year (Optional)</label>
+              <div className="flex flex-wrap gap-2">
+                <button 
+                  onClick={() => setSelectedYear(null)}
+                  className={`px-4 py-2 rounded-xl border text-sm transition-all ${selectedYear === null ? 'border-emerald-600 bg-emerald-50 font-bold' : 'border-zinc-100'}`}
+                >
+                  All Years
+                </button>
+                {years.map(y => (
+                  <button 
+                    key={y}
+                    onClick={() => setSelectedYear(y as number)}
+                    className={`px-4 py-2 rounded-xl border text-sm transition-all ${selectedYear === y ? 'border-emerald-600 bg-emerald-50 font-bold' : 'border-zinc-100'}`}
+                  >
+                    {y}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="p-6 bg-emerald-50 rounded-3xl border border-emerald-100">
+              <h4 className="font-bold text-emerald-900 mb-2">Ready to start?</h4>
+              <p className="text-sm text-emerald-700 mb-4">You'll be practicing {selectedSubject} for {selectedExamType}. Ace will pick 10 questions for you.</p>
+              <Button className="w-full py-4 text-lg" onClick={startPractice} icon={Play}>
+                Start Practice Session
+              </Button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
 // --- Main App ---
 
 export default function App() {
@@ -329,6 +568,7 @@ export default function App() {
   const [activeSession, setActiveSession] = useState<StudySession | null>(null);
   const [activeQuiz, setActiveQuiz] = useState<any | null>(null);
   const [quizCache, setQuizCache] = useState<{ [key: string]: any[] }>({});
+  const [showExamPractice, setShowExamPractice] = useState(false);
   const [showBuddyEdit, setShowBuddyEdit] = useState(false);
   const [newSubject, setNewSubject] = useState('');
   const [email, setEmail] = useState('');
@@ -852,12 +1092,16 @@ export default function App() {
     }
   };
 
-  const handleQuizComplete = async (score: number, total: number) => {
-    if (!activeQuiz || !user) return;
+  const handleQuizComplete = async (score: number, total: number, subject?: string, examType?: string) => {
+    if (!user) return;
     
+    const quizSubject = subject || activeQuiz?.subject;
+    if (!quizSubject) return;
+
     const result: QuizResult = {
       userId: user.uid,
-      subject: activeQuiz.subject,
+      subject: quizSubject,
+      examType: examType || 'General',
       score,
       totalQuestions: total,
       date: new Date().toISOString()
@@ -867,18 +1111,76 @@ export default function App() {
       await addDoc(collection(db, 'quizResults'), result);
       setQuizResults(prev => [...prev, result]);
       setActiveQuiz(null);
-      setToast({ title: 'Quiz Saved', message: `You scored ${score}/${total} in ${activeQuiz.subject}!`, type: 'success' });
+      setShowExamPractice(false);
+      setToast({ title: 'Quiz Saved', message: `You scored ${score}/${total} in ${quizSubject}!`, type: 'success' });
       
+      // Smart Integration: Adjust timetable based on performance
+      adjustTimetableBasedOnPerformance(quizSubject, score, total);
+
       // Clear cache for this subject to get fresh questions next time if desired
-      // or keep it for a while. Let's clear it to ensure variety.
       setQuizCache(prev => {
         const newCache = { ...prev };
-        delete newCache[activeQuiz.subject];
+        delete newCache[quizSubject];
         return newCache;
       });
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, 'quizResults');
     }
+  };
+
+  const adjustTimetableBasedOnPerformance = async (subject: string, score: number, total: number) => {
+    if (!user || !profile || !currentSchedule) return;
+
+    const percentage = (score / total) * 100;
+    let adjustmentMessage = '';
+
+    // Simple logic: 
+    // < 50% -> Increase study time (Poor performance)
+    // > 80% -> Decrease study time slightly (Strong performance)
+    
+    if (percentage < 50) {
+      adjustmentMessage = `Ace noticed you're struggling with ${subject}. I've increased its study time in your next schedule.`;
+      // In a real app, we'd update the profile's weaknesses or a specific weight for the AI generator
+      const newWeaknesses = Array.from(new Set([...(profile.weaknesses || []), subject]));
+      await updateDoc(doc(db, 'users', user.uid), { weaknesses: newWeaknesses });
+    } else if (percentage > 85) {
+      adjustmentMessage = `Great job in ${subject}! You're mastering this. I'll focus more on other subjects for now.`;
+      const newStrengths = Array.from(new Set([...(profile.strengths || []), subject]));
+      const newWeaknesses = (profile.weaknesses || []).filter(w => w !== subject);
+      await updateDoc(doc(db, 'users', user.uid), { strengths: newStrengths, weaknesses: newWeaknesses });
+    }
+
+    if (adjustmentMessage) {
+      setToast({ title: 'Ace Recommendation', message: adjustmentMessage, type: 'info' });
+      // Trigger a schedule regeneration to reflect changes
+      handleGenerateSchedule();
+    }
+  };
+
+  const getPerformanceInsights = () => {
+    if (quizResults.length === 0) return null;
+
+    const subjectStats: { [key: string]: { total: number, score: number, count: number } } = {};
+    
+    quizResults.forEach(res => {
+      if (!subjectStats[res.subject]) {
+        subjectStats[res.subject] = { total: 0, score: 0, count: 0 };
+      }
+      subjectStats[res.subject].total += res.totalQuestions;
+      subjectStats[res.subject].score += res.score;
+      subjectStats[res.subject].count += 1;
+    });
+
+    const insights = Object.entries(subjectStats).map(([subject, stats]) => ({
+      subject,
+      avgScore: (stats.score / stats.total) * 100,
+      count: stats.count
+    }));
+
+    const weak = insights.filter(i => i.avgScore < 60).sort((a, b) => a.avgScore - b.avgScore);
+    const strong = insights.filter(i => i.avgScore >= 80).sort((a, b) => b.avgScore - a.avgScore);
+
+    return { weak, strong };
   };
 
   // --- Prefetching ---
@@ -1321,7 +1623,107 @@ export default function App() {
                 )}
               </header>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pb-20">
+                {/* Exam Practice Card */}
+                <Card className="col-span-full bg-violet-600 text-white border-none p-8 relative overflow-hidden group cursor-pointer" onClick={() => setShowExamPractice(true)}>
+                  <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                    <div className="space-y-4">
+                      <div className="w-16 h-16 rounded-3xl bg-white/20 flex items-center justify-center backdrop-blur-md shadow-xl">
+                        <Award size={32} className="text-white" />
+                      </div>
+                      <div>
+                        <h3 className="text-3xl font-bold tracking-tight">Exam Practice Hub</h3>
+                        <p className="text-violet-100 text-sm mt-2 max-w-md">Practice for JAMB, WAEC, and more with original syllabus-based questions.</p>
+                      </div>
+                      <div className="flex gap-4 pt-2">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle size={16} className="text-violet-200" />
+                          <span className="text-xs font-medium text-violet-100">JAMB & WAEC</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <CheckCircle size={16} className="text-violet-200" />
+                          <span className="text-xs font-medium text-violet-100">Performance Tracking</span>
+                        </div>
+                      </div>
+                    </div>
+                    <Button variant="secondary" className="bg-white text-violet-600 border-none hover:bg-violet-50 px-8 py-4 text-lg font-bold shadow-lg" icon={Play}>
+                      Start Practice
+                    </Button>
+                  </div>
+                  {/* Decorative background elements */}
+                  <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-white/10 rounded-full blur-3xl group-hover:bg-white/20 transition-all duration-500" />
+                  <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-48 h-48 bg-violet-400/20 rounded-full blur-2xl" />
+                </Card>
+
+                {/* Performance Insights */}
+                {getPerformanceInsights() && (
+                  <Card className="col-span-full bg-zinc-50 border-zinc-100">
+                    <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                      <TrendingUp size={16} /> Performance Insights
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <p className="text-xs font-bold text-zinc-500 mb-3 uppercase tracking-wider">Strong Subjects</p>
+                        <div className="space-y-2">
+                          {getPerformanceInsights()?.strong.length ? getPerformanceInsights()?.strong.map(i => (
+                            <div key={i.subject} className="flex items-center justify-between p-3 bg-white rounded-xl border border-zinc-100">
+                              <span className="text-sm font-bold">{i.subject}</span>
+                              <Badge color="emerald">{Math.round(i.avgScore)}%</Badge>
+                            </div>
+                          )) : <p className="text-xs text-zinc-400 italic">Keep practicing to see insights!</p>}
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-zinc-500 mb-3 uppercase tracking-wider">Focus Needed</p>
+                        <div className="space-y-2">
+                          {getPerformanceInsights()?.weak.length ? getPerformanceInsights()?.weak.map(i => (
+                            <div key={i.subject} className="flex items-center justify-between p-3 bg-white rounded-xl border border-zinc-100">
+                              <span className="text-sm font-bold">{i.subject}</span>
+                              <Badge color="amber">{Math.round(i.avgScore)}%</Badge>
+                            </div>
+                          )) : <p className="text-xs text-zinc-400 italic">You're doing great across all subjects!</p>}
+                        </div>
+                      </div>
+                    </div>
+                    {getPerformanceInsights()?.weak.length ? (
+                      <div className="mt-6 p-4 bg-amber-50 rounded-2xl border border-amber-100 flex items-center gap-3">
+                        <Sparkles className="text-amber-600" size={20} />
+                        <p className="text-xs text-amber-800 font-medium">
+                          Ace suggests: You should focus more on <span className="font-bold">{getPerformanceInsights()?.weak[0].subject}</span> this week to improve your score.
+                        </p>
+                      </div>
+                    ) : null}
+                  </Card>
+                )}
+
+                {/* Resources Section */}
+                <Card className="col-span-full">
+                  <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                    <ExternalLink size={16} /> External Resources
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {[
+                      { name: 'JAMB Official Portal', url: 'https://www.jamb.gov.ng/', desc: 'Registration and official updates.' },
+                      { name: 'WAEC e-Learning', url: 'https://www.waeconline.org.ng/elearning', desc: 'Past questions and chief examiner reports.' },
+                      { name: 'MySchool JAMB CBT', url: 'https://myschool.ng/cbt', desc: 'Online practice tests and news.' }
+                    ].map(res => (
+                      <a 
+                        key={res.name} 
+                        href={res.url} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="p-4 rounded-2xl border border-zinc-100 hover:border-emerald-600 hover:bg-emerald-50 transition-all group"
+                      >
+                        <div className="flex justify-between items-start mb-2">
+                          <h4 className="font-bold text-sm group-hover:text-emerald-700">{res.name}</h4>
+                          <ExternalLink size={14} className="text-zinc-400 group-hover:text-emerald-600" />
+                        </div>
+                        <p className="text-[10px] text-zinc-500 leading-relaxed">{res.desc}</p>
+                      </a>
+                    ))}
+                  </div>
+                </Card>
+
                 {profile?.subjects?.map((subject) => {
                   const progress = getSubjectProgress(subject);
                   const goal = profile.practiceGoals?.find(g => g.subject === subject);
@@ -1728,6 +2130,12 @@ export default function App() {
             onCacheQuestions={(qs: any[]) => setQuizCache(prev => ({ ...prev, [activeQuiz.subject]: qs }))}
             onComplete={handleQuizComplete} 
             onCancel={() => setActiveQuiz(null)} 
+          />
+        )}
+        {showExamPractice && (
+          <ExamPractice 
+            onCancel={() => setShowExamPractice(false)} 
+            onComplete={handleQuizComplete}
           />
         )}
         {showBuddyEdit && profile && (
