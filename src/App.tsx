@@ -64,21 +64,30 @@ const Badge = ({ children, color = 'emerald' }: any) => {
   );
 };
 
-const Quiz = ({ subject, educationLevel, onComplete, onCancel }: any) => {
-  const [questions, setQuestions] = useState<any[]>([]);
+const Quiz = ({ subject, educationLevel, targetExams, cachedQuestions, onCacheQuestions, onComplete, onCancel }: any) => {
+  const [questions, setQuestions] = useState<any[]>(cachedQuestions || []);
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [score, setScore] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!cachedQuestions);
   const [finished, setFinished] = useState(false);
 
   useEffect(() => {
+    if (cachedQuestions) return;
+    
     const fetchQuiz = async () => {
-      const q = await generateQuiz(subject, educationLevel);
-      setQuestions(q);
-      setLoading(false);
+      setLoading(true);
+      try {
+        const q = await generateQuiz(subject, educationLevel, targetExams);
+        setQuestions(q);
+        onCacheQuestions(q);
+      } catch (error) {
+        console.error("Quiz generation failed:", error);
+      } finally {
+        setLoading(false);
+      }
     };
     fetchQuiz();
-  }, [subject, educationLevel]);
+  }, [subject, educationLevel, targetExams, cachedQuestions]);
 
   const handleAnswer = (idx: number) => {
     if (idx === questions[currentQuestion].correctAnswer) {
@@ -91,16 +100,53 @@ const Quiz = ({ subject, educationLevel, onComplete, onCancel }: any) => {
     }
   };
 
-  if (loading || questions.length === 0) {
+  if (loading) {
     return (
-      <div className="fixed inset-0 bg-white z-[100] flex flex-col items-center justify-center p-6">
-        <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: 'linear' }} className="mb-4">
-          <RefreshCw className="text-emerald-600" size={32} />
-        </motion.div>
-        <p className="text-zinc-500 font-medium">{loading ? 'Ace is generating your quiz...' : 'No questions found for this subject.'}</p>
-        {!loading && questions.length === 0 && (
-          <Button variant="secondary" className="mt-4" onClick={onCancel}>Go Back</Button>
-        )}
+      <div className="fixed inset-0 bg-white z-[100] flex flex-col p-6 overflow-hidden">
+        <div className="flex justify-between items-center mb-12">
+          <div className="space-y-2">
+            <div className="h-2 w-24 bg-zinc-100 rounded-full animate-pulse" />
+            <div className="h-6 w-48 bg-zinc-100 rounded-lg animate-pulse" />
+          </div>
+          <div className="w-10 h-10 bg-zinc-50 rounded-full animate-pulse" />
+        </div>
+        
+        <div className="flex-1 max-w-2xl mx-auto w-full space-y-8">
+          <div className="space-y-4">
+            <div className="h-8 w-full bg-zinc-100 rounded-xl animate-pulse" />
+            <div className="h-8 w-3/4 bg-zinc-100 rounded-xl animate-pulse" />
+          </div>
+          
+          <div className="space-y-3">
+            {[1, 2, 3, 4].map(i => (
+              <div key={i} className="h-16 w-full bg-zinc-50 rounded-2xl border border-zinc-100 animate-pulse" />
+            ))}
+          </div>
+        </div>
+        
+        <div className="flex flex-col items-center justify-center absolute inset-0 pointer-events-none">
+          <motion.div 
+            animate={{ rotate: 360 }} 
+            transition={{ repeat: Infinity, duration: 1.5, ease: 'linear' }} 
+            className="mb-4"
+          >
+            <RefreshCw className="text-emerald-600 opacity-20" size={48} />
+          </motion.div>
+          <p className="text-zinc-400 font-bold text-[10px] uppercase tracking-widest animate-pulse">Ace is crafting your quiz...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (questions.length === 0) {
+    return (
+      <div className="fixed inset-0 bg-white z-[100] flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-20 h-20 bg-zinc-50 rounded-3xl flex items-center justify-center text-zinc-300 mb-6">
+          <BookOpen size={40} />
+        </div>
+        <h2 className="text-2xl font-bold mb-2">No Questions Found</h2>
+        <p className="text-zinc-500 mb-8">Ace couldn't generate questions for this subject right now.</p>
+        <Button variant="secondary" onClick={onCancel}>Go Back</Button>
       </div>
     );
   }
@@ -282,6 +328,7 @@ export default function App() {
   const [isTimerRunning, setIsTimerRunning] = useState(false);
   const [activeSession, setActiveSession] = useState<StudySession | null>(null);
   const [activeQuiz, setActiveQuiz] = useState<any | null>(null);
+  const [quizCache, setQuizCache] = useState<{ [key: string]: any[] }>({});
   const [showBuddyEdit, setShowBuddyEdit] = useState(false);
   const [newSubject, setNewSubject] = useState('');
   const [email, setEmail] = useState('');
@@ -797,6 +844,61 @@ export default function App() {
     }
   };
 
+  const handleStartQuiz = async (subject: string) => {
+    setActiveQuiz({ subject });
+    if (!quizCache[subject]) {
+      // Prefetching logic could go here, but for now we just mark it as active
+      // and the Quiz component will handle the fetch if not in cache.
+    }
+  };
+
+  const handleQuizComplete = async (score: number, total: number) => {
+    if (!activeQuiz || !user) return;
+    
+    const result: QuizResult = {
+      userId: user.uid,
+      subject: activeQuiz.subject,
+      score,
+      totalQuestions: total,
+      date: new Date().toISOString()
+    };
+
+    try {
+      await addDoc(collection(db, 'quizResults'), result);
+      setQuizResults(prev => [...prev, result]);
+      setActiveQuiz(null);
+      setToast({ title: 'Quiz Saved', message: `You scored ${score}/${total} in ${activeQuiz.subject}!`, type: 'success' });
+      
+      // Clear cache for this subject to get fresh questions next time if desired
+      // or keep it for a while. Let's clear it to ensure variety.
+      setQuizCache(prev => {
+        const newCache = { ...prev };
+        delete newCache[activeQuiz.subject];
+        return newCache;
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, 'quizResults');
+    }
+  };
+
+  // --- Prefetching ---
+  useEffect(() => {
+    if (activeTab === 'practice' && profile?.subjects) {
+      profile.subjects.forEach(subject => {
+        if (!quizCache[subject]) {
+          // Prefetch in background
+          generateQuiz(subject, profile.educationLevel, profile.targetExams)
+            .then(qs => {
+              if (qs && qs.length > 0) {
+                setQuizCache(prev => ({ ...prev, [subject]: qs }));
+              }
+            })
+            .catch(err => console.error(`Prefetch failed for ${subject}:`, err));
+        }
+      });
+    }
+  }, [activeTab, profile, quizCache]);
+
   // --- Views ---
 
   if (loading) {
@@ -901,9 +1003,9 @@ export default function App() {
   }
 
   return (
-    <div className={`min-h-screen bg-zinc-50 pb-24 lg:pb-0 lg:pl-64 pt-16 ${accessibilitySettings.highContrast ? 'contrast-125' : ''} ${accessibilitySettings.largeText ? 'text-lg' : ''}`}>
+    <div className={`min-h-screen bg-zinc-50 pb-32 lg:pb-0 lg:pl-64 pt-20 ${accessibilitySettings.highContrast ? 'contrast-125' : ''} ${accessibilitySettings.largeText ? 'text-lg' : ''}`}>
       {/* Top Bar / Quick Menu */}
-      <header className="fixed top-0 left-0 right-0 h-16 bg-white/80 backdrop-blur-md border-b border-zinc-100 z-40 lg:left-64 flex items-center justify-between px-6">
+      <header className="fixed top-0 left-0 right-0 h-16 bg-white/90 backdrop-blur-md border-b border-zinc-100 z-40 lg:left-64 flex items-center justify-between px-6 shadow-sm">
         <div className="flex items-center gap-2 lg:hidden">
           <Sparkles className="text-emerald-600" size={20} />
           <span className="font-bold text-lg">Study Buddy</span>
@@ -949,7 +1051,7 @@ export default function App() {
       </header>
 
       {/* Sidebar (Desktop) / Bottom Nav (Mobile) */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-zinc-100 px-6 py-3 flex justify-between items-center z-50 lg:top-0 lg:bottom-0 lg:left-0 lg:w-64 lg:flex-col lg:border-r lg:border-t-0 lg:py-10">
+      <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-zinc-100 px-4 py-2 flex justify-around items-center z-50 lg:top-0 lg:bottom-0 lg:left-0 lg:w-64 lg:flex-col lg:border-r lg:border-t-0 lg:py-10 lg:px-6 shadow-[0_-4px_20px_rgba(0,0,0,0.03)]">
         <div className="hidden lg:flex items-center gap-3 mb-12 px-4">
           <div className="w-10 h-10 bg-emerald-600 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-100">
             <Sparkles className="text-white" size={20} />
@@ -1266,7 +1368,7 @@ export default function App() {
                         </div>
                       )}
 
-                      <Button variant="secondary" className="w-full text-xs py-2" icon={Play} onClick={() => setActiveQuiz({ subject })}>
+                      <Button variant="secondary" className="w-full text-xs py-2" icon={Play} onClick={() => handleStartQuiz(subject)}>
                         Start Practice
                       </Button>
                     </Card>
@@ -1620,21 +1722,12 @@ export default function App() {
         {activeQuiz && (
           <Quiz 
             subject={activeQuiz.subject} 
-            educationLevel={profile?.educationLevel} 
-            targetExams={profile?.targetExams}
-            onComplete={async (score: number, total: number) => {
-              if (user) {
-                await addDoc(collection(db, 'quizResults'), {
-                  userId: user.uid,
-                  subject: activeQuiz.subject,
-                  score,
-                  totalQuestions: total,
-                  date: new Date().toISOString()
-                });
-              }
-              setActiveQuiz(null);
-            }}
-            onCancel={() => setActiveQuiz(null)}
+            educationLevel={profile?.educationLevel || 'Secondary'} 
+            targetExams={profile?.targetExams || []}
+            cachedQuestions={quizCache[activeQuiz.subject]}
+            onCacheQuestions={(qs: any[]) => setQuizCache(prev => ({ ...prev, [activeQuiz.subject]: qs }))}
+            onComplete={handleQuizComplete} 
+            onCancel={() => setActiveQuiz(null)} 
           />
         )}
         {showBuddyEdit && profile && (
@@ -1903,8 +1996,8 @@ function Onboarding({ profile, onComplete, user }: any) {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-50 flex items-center justify-center p-4 sm:p-6">
-      <Card className="max-w-md w-full p-6 sm:p-8">
+    <div className="min-h-screen bg-zinc-50 flex flex-col items-center justify-start p-4 sm:p-6 overflow-y-auto">
+      <Card className="max-w-md w-full p-6 sm:p-8 my-auto">
         <div className="flex justify-between items-center mb-8">
           <div className="flex gap-1">
             {[1, 2, 3, 4, 5].map(s => (
