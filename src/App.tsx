@@ -71,6 +71,10 @@ const Quiz = ({ subject, educationLevel, targetExams, cachedQuestions, onCacheQu
   const [score, setScore] = useState(0);
   const [loading, setLoading] = useState(!cachedQuestions);
   const [finished, setFinished] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(600); // 10 minutes (600 seconds)
+  const [isTimeUp, setIsTimeUp] = useState(false);
+  const [selectedOption, setSelectedOption] = useState<number | null>(null);
+  const [showFeedback, setShowFeedback] = useState(false);
 
   useEffect(() => {
     if (cachedQuestions) return;
@@ -90,15 +94,47 @@ const Quiz = ({ subject, educationLevel, targetExams, cachedQuestions, onCacheQu
     fetchQuiz();
   }, [subject, educationLevel, targetExams, cachedQuestions]);
 
+  useEffect(() => {
+    if (loading || finished || questions.length === 0) return;
+
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          setIsTimeUp(true);
+          setFinished(true);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [loading, finished, questions.length]);
+
   const handleAnswer = (idx: number) => {
+    if (showFeedback) return;
+    setSelectedOption(idx);
+    setShowFeedback(true);
     if (idx === questions[currentQuestion].correctAnswer) {
       setScore(s => s + 1);
     }
+  };
+
+  const nextQuestion = () => {
+    setShowFeedback(false);
+    setSelectedOption(null);
     if (currentQuestion < questions.length - 1) {
       setCurrentQuestion(c => c + 1);
     } else {
       setFinished(true);
     }
+  };
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   if (loading) {
@@ -155,11 +191,13 @@ const Quiz = ({ subject, educationLevel, targetExams, cachedQuestions, onCacheQu
   if (finished) {
     return (
       <div className="fixed inset-0 bg-white z-[100] flex flex-col items-center justify-center p-6 text-center">
-        <div className="w-20 h-20 bg-emerald-100 rounded-3xl flex items-center justify-center text-emerald-600 mb-6">
-          <Award size={40} />
+        <div className={`w-20 h-20 ${isTimeUp ? 'bg-amber-100 text-amber-600' : 'bg-emerald-100 text-emerald-600'} rounded-3xl flex items-center justify-center mb-6`}>
+          {isTimeUp ? <Timer size={40} /> : <Award size={40} />}
         </div>
-        <h2 className="text-3xl font-bold mb-2">Quiz Complete!</h2>
-        <p className="text-zinc-500 mb-8">You scored {score} out of {questions.length}</p>
+        <h2 className="text-3xl font-bold mb-2">{isTimeUp ? 'Time is Up!' : 'Quiz Complete!'}</h2>
+        <p className="text-zinc-500 mb-2">You scored {score} out of {questions.length}</p>
+        {isTimeUp && <p className="text-amber-600 font-bold text-sm mb-8">Quiz marked as incomplete due to timeout.</p>}
+        {!isTimeUp && <p className="text-zinc-400 text-sm mb-8">Great job finishing on time!</p>}
         <div className="flex gap-3 w-full max-w-xs">
           <Button className="flex-1" onClick={() => onComplete(score, questions.length)}>Finish</Button>
         </div>
@@ -170,10 +208,15 @@ const Quiz = ({ subject, educationLevel, targetExams, cachedQuestions, onCacheQu
   const q = questions[currentQuestion];
 
   return (
-    <div className="fixed inset-0 bg-white z-[100] flex flex-col p-6">
-      <div className="flex justify-between items-center mb-12">
+    <div className="fixed inset-0 bg-white z-[100] flex flex-col p-6 overflow-y-auto">
+      <div className="flex justify-between items-center mb-8">
         <div>
-          <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Question {currentQuestion + 1} of {questions.length}</p>
+          <div className="flex items-center gap-2 mb-1">
+            <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Question {currentQuestion + 1} of {questions.length}</p>
+            <div className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest ${timeLeft < 60 ? 'bg-red-100 text-red-600 animate-pulse' : 'bg-zinc-100 text-zinc-600'}`}>
+              {formatTime(timeLeft)}
+            </div>
+          </div>
           <h3 className="text-lg font-bold">{subject} Practice</h3>
         </div>
         <button onClick={onCancel} className="p-2 hover:bg-zinc-100 rounded-full transition-colors flex items-center gap-2 text-zinc-500 font-bold text-xs">
@@ -181,24 +224,49 @@ const Quiz = ({ subject, educationLevel, targetExams, cachedQuestions, onCacheQu
         </button>
       </div>
 
-      <div className="flex-1 max-w-2xl mx-auto w-full">
+      <div className="flex-1 max-w-2xl mx-auto w-full pb-24">
         <h4 className="text-2xl font-bold mb-8 leading-tight">{q.question}</h4>
         <div className="space-y-3">
-          {q.options.map((opt: string, idx: number) => (
-            <button 
-              key={idx}
-              onClick={() => handleAnswer(idx)}
-              className="w-full p-5 text-left rounded-2xl border border-zinc-100 hover:border-emerald-600 hover:bg-emerald-50 transition-all group"
-            >
-              <div className="flex items-center gap-4">
-                <div className="w-8 h-8 rounded-lg bg-zinc-50 flex items-center justify-center text-xs font-bold text-zinc-400 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+          {q.options.map((opt: string, idx: number) => {
+            let style = "border-zinc-100";
+            if (showFeedback) {
+              if (idx === q.correctAnswer) style = "border-emerald-500 bg-emerald-50 text-emerald-700";
+              else if (idx === selectedOption) style = "border-red-500 bg-red-50 text-red-700";
+              else style = "opacity-50";
+            }
+
+            return (
+              <button 
+                key={idx}
+                disabled={showFeedback}
+                onClick={() => handleAnswer(idx)}
+                className={`w-full p-5 text-left rounded-2xl border transition-all group flex items-center gap-4 ${style} ${!showFeedback ? 'hover:border-emerald-600 hover:bg-emerald-50' : ''}`}
+              >
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold ${showFeedback && idx === q.correctAnswer ? 'bg-emerald-600 text-white' : 'bg-zinc-50 text-zinc-400 group-hover:bg-emerald-600 group-hover:text-white transition-colors'}`}>
                   {String.fromCharCode(65 + idx)}
                 </div>
                 <span className="font-medium">{opt}</span>
-              </div>
-            </button>
-          ))}
+              </button>
+            );
+          })}
         </div>
+
+        {showFeedback && (
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }} 
+            animate={{ opacity: 1, y: 0 }} 
+            className="mt-8 p-6 bg-zinc-50 rounded-2xl border border-zinc-100"
+          >
+            <div className="flex items-center gap-2 mb-2">
+              <Info size={16} className="text-emerald-600" />
+              <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Explanation</p>
+            </div>
+            <p className="text-sm text-zinc-600 leading-relaxed mb-6">{q.explanation}</p>
+            <Button className="w-full" onClick={nextQuestion} icon={ChevronRight}>
+              {currentQuestion === questions.length - 1 ? 'See Results' : 'Next Question'}
+            </Button>
+          </motion.div>
+        )}
       </div>
     </div>
   );
@@ -325,8 +393,8 @@ const ExamPractice = ({ onCancel, onComplete }: { onCancel: () => void, onComple
       return;
     }
 
-    // Shuffle and pick 10 questions
-    const shuffled = [...filtered].sort(() => 0.5 - Math.random()).slice(0, 10);
+    // Shuffle and pick 20 questions
+    const shuffled = [...filtered].sort(() => 0.5 - Math.random()).slice(0, 20);
 
     setQuestions(shuffled);
     setUserAnswers(new Array(shuffled.length).fill(null));
@@ -712,7 +780,7 @@ export default function App() {
     if (profile.practiceGoals && profile.practiceGoals.length > 0) {
       const topGoal = profile.practiceGoals[0];
       const progress = getSubjectProgress(topGoal.subject);
-      progressContext = `The student has a goal for ${topGoal.subject}: ${progress.quizzes}/${topGoal.targetQuizzes} quizzes done, average score ${progress.score}%.`;
+      progressContext = `${profile.displayName} has a goal for ${topGoal.subject}: ${progress.quizzes}/${topGoal.targetQuizzes} quizzes done, average score ${progress.score}%.`;
     }
 
     try {
@@ -1382,10 +1450,10 @@ export default function App() {
           <div className="p-4 bg-zinc-50 rounded-2xl border border-zinc-100">
             <div className="flex items-center gap-3 mb-2">
               <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold text-xs">
-                {user.displayName?.[0]}
+                {(profile?.displayName || user?.displayName)?.[0] || 'S'}
               </div>
               <div className="overflow-hidden">
-                <p className="text-sm font-bold truncate">{user.displayName}</p>
+                <p className="text-sm font-bold truncate">{profile?.displayName || user?.displayName || user?.email?.split('@')[0] || 'Student'}</p>
                 <p className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider">Free Plan</p>
               </div>
             </div>
@@ -1434,7 +1502,7 @@ export default function App() {
               {/* Header */}
               <header className="flex justify-between items-end">
                 <div>
-                  <h2 className="text-3xl font-bold text-zinc-900 tracking-tight">Good morning, {user.displayName?.split(' ')[0]}!</h2>
+                  <h2 className="text-3xl font-bold text-zinc-900 tracking-tight">Good morning, {(profile?.displayName || user?.displayName || user?.email?.split('@')[0] || 'Student').split(' ')[0]}!</h2>
                   <p className="text-zinc-500 mt-1">Ready to crush your goals today?</p>
                 </div>
                 <div className="hidden sm:flex gap-3">
@@ -1696,34 +1764,6 @@ export default function App() {
                   </Card>
                 )}
 
-                {/* Resources Section */}
-                <Card className="col-span-full">
-                  <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                    <ExternalLink size={16} /> External Resources
-                  </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {[
-                      { name: 'JAMB Official Portal', url: 'https://www.jamb.gov.ng/', desc: 'Registration and official updates.' },
-                      { name: 'WAEC e-Learning', url: 'https://www.waeconline.org.ng/elearning', desc: 'Past questions and chief examiner reports.' },
-                      { name: 'MySchool JAMB CBT', url: 'https://myschool.ng/cbt', desc: 'Online practice tests and news.' }
-                    ].map(res => (
-                      <a 
-                        key={res.name} 
-                        href={res.url} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="p-4 rounded-2xl border border-zinc-100 hover:border-emerald-600 hover:bg-emerald-50 transition-all group"
-                      >
-                        <div className="flex justify-between items-start mb-2">
-                          <h4 className="font-bold text-sm group-hover:text-emerald-700">{res.name}</h4>
-                          <ExternalLink size={14} className="text-zinc-400 group-hover:text-emerald-600" />
-                        </div>
-                        <p className="text-[10px] text-zinc-500 leading-relaxed">{res.desc}</p>
-                      </a>
-                    ))}
-                  </div>
-                </Card>
-
                 {profile?.subjects?.map((subject) => {
                   const progress = getSubjectProgress(subject);
                   const goal = profile.practiceGoals?.find(g => g.subject === subject);
@@ -1954,6 +1994,34 @@ export default function App() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-6">
+                  <section>
+                    <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-widest mb-4">Profile</h3>
+                    <Card className="space-y-4">
+                      <div>
+                        <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">Display Name</label>
+                        <div className="flex gap-2">
+                          <input 
+                            type="text" 
+                            placeholder="Your name..."
+                            defaultValue={profile?.displayName}
+                            onBlur={async (e) => {
+                              if (profile && e.target.value && e.target.value !== profile.displayName) {
+                                try {
+                                  const updated = { ...profile, displayName: e.target.value };
+                                  await setDoc(doc(db, 'users', profile.uid), updated);
+                                  setProfile(updated);
+                                } catch (err) {
+                                  console.error("Failed to update name:", err);
+                                }
+                              }
+                            }}
+                            className="flex-1 px-3 py-1.5 border border-zinc-100 rounded-xl text-xs focus:outline-none focus:border-emerald-600"
+                          />
+                        </div>
+                      </div>
+                    </Card>
+                  </section>
+
                   <section>
                     <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-widest mb-4">My Subjects</h3>
                     <Card className="space-y-4">
@@ -2368,7 +2436,7 @@ function Onboarding({ profile, onComplete, user }: any) {
 
     const fullProfile: UserProfile = {
       uid: user.uid,
-      displayName: user.displayName || 'Student',
+      displayName: data.displayName || user.displayName || user.email?.split('@')[0] || 'Student',
       email: user.email || '',
       educationLevel: data.educationLevel as any,
       targetExams: data.targetExams || [],
@@ -2427,6 +2495,17 @@ function Onboarding({ profile, onComplete, user }: any) {
             <p className="text-sm text-zinc-500 mb-8">Tell us about your current academic focus.</p>
             
             <div className="space-y-6">
+              <div>
+                <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-3">Your Name</label>
+                <input 
+                  type="text"
+                  value={data.displayName || user.displayName || user.email?.split('@')[0] || ''}
+                  onChange={(e) => setData({ ...data, displayName: e.target.value })}
+                  placeholder="Enter your name"
+                  className="w-full p-4 rounded-2xl border border-zinc-100 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600 transition-all"
+                />
+              </div>
+
               <div>
                 <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-3">Education Level</label>
                 <div className="grid grid-cols-2 gap-3">

@@ -9,7 +9,7 @@ const getAI = () => {
 export async function generateTimetable(profile: UserProfile): Promise<ScheduleBlock[]> {
   const ai = getAI();
   const prompt = `
-    Generate a personalized study schedule for a ${profile.educationLevel} student.
+    Generate a personalized study schedule for ${profile.displayName}, a ${profile.educationLevel} student.
     Target Exams: ${profile.targetExams.join(", ")}
     Strengths: ${profile.strengths.join(", ")}
     Weaknesses: ${profile.weaknesses.join(", ")}
@@ -83,7 +83,7 @@ export async function generateQuiz(subject: string, educationLevel: string, targ
   const ai = getAI();
   const examContext = targetExams.length > 0 ? ` specifically for ${targetExams.join(", ")}` : "";
   const prompt = `
-    Generate a 5-question multiple-choice quiz for a ${educationLevel} student on the subject: ${subject}${examContext}.
+    Generate a 20-question multiple-choice quiz for a ${educationLevel} student on the subject: ${subject}${examContext}.
     Each question should have 4 options and a correct answer index (0-3).
     Return a list of objects with question, options (array), and correctAnswer (number).
   `;
@@ -100,9 +100,10 @@ export async function generateQuiz(subject: string, educationLevel: string, targ
           properties: {
             question: { type: Type.STRING },
             options: { type: Type.ARRAY, items: { type: Type.STRING } },
-            correctAnswer: { type: Type.INTEGER }
+            correctAnswer: { type: Type.INTEGER },
+            explanation: { type: Type.STRING, description: "A brief explanation of why the answer is correct." }
           },
-          required: ["question", "options", "correctAnswer"]
+          required: ["question", "options", "correctAnswer", "explanation"]
         }
       }
     }

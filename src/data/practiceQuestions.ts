@@ -554,5 +554,189 @@ export const PRACTICE_QUESTIONS: ExamQuestion[] = [
     correctAnswer: 2,
     explanation: "The plot is the sequence of events where each affects the next one through the principle of cause-and-effect.",
     sourceType: "original"
+  },
+  // English - Batch 4
+  {
+    id: "jamb-eng-2023-05",
+    subject: "English",
+    year: 2023,
+    examType: "JAMB",
+    question: "Choose the option that best completes the sentence: The new policy is ______ to improve the company's efficiency.",
+    options: ["designed", "designing", "design", "designs"],
+    correctAnswer: 0,
+    explanation: "The sentence requires a past participle to form the passive voice: 'is designed'.",
+    sourceType: "original"
+  },
+  {
+    id: "waec-eng-2023-03",
+    subject: "English",
+    year: 2023,
+    examType: "WAEC",
+    question: "Identify the part of speech of the underlined word: She ran **quickly** to the store.",
+    options: ["Noun", "Verb", "Adjective", "Adverb"],
+    correctAnswer: 3,
+    explanation: "'Quickly' is an adverb because it modifies the verb 'ran'.",
+    sourceType: "original"
+  },
+  // Mathematics - Batch 4
+  {
+    id: "jamb-math-2023-05",
+    subject: "Mathematics",
+    year: 2023,
+    examType: "JAMB",
+    question: "Simplify: (x^2 - 4) / (x - 2).",
+    options: ["x - 2", "x + 2", "x + 4", "x - 4"],
+    correctAnswer: 1,
+    explanation: "x^2 - 4 is a difference of two squares: (x-2)(x+2). Dividing by (x-2) leaves (x+2).",
+    sourceType: "original"
+  },
+  {
+    id: "waec-math-2023-03",
+    subject: "Mathematics",
+    year: 2023,
+    examType: "WAEC",
+    question: "If the area of a circle is 154 cm^2, find its radius (Take pi = 22/7).",
+    options: ["7 cm", "14 cm", "21 cm", "3.5 cm"],
+    correctAnswer: 0,
+    explanation: "Area = pi * r^2 => 154 = (22/7) * r^2 => r^2 = (154 * 7) / 22 = 49 => r = 7.",
+    sourceType: "original"
+  },
+  // Biology - Batch 4
+  {
+    id: "jamb-bio-2023-03",
+    subject: "Biology",
+    year: 2023,
+    examType: "JAMB",
+    question: "The basic unit of life is the:",
+    options: ["Tissue", "Organ", "Cell", "System"],
+    correctAnswer: 2,
+    explanation: "The cell is the smallest unit of an organism that is capable of independent functioning.",
+    sourceType: "original"
+  },
+  {
+    id: "waec-bio-2023-05",
+    subject: "Biology",
+    year: 2023,
+    examType: "WAEC",
+    question: "Which of the following is a function of the liver?",
+    options: ["Production of insulin", "Detoxification of blood", "Filtration of urine", "Pumping of blood"],
+    correctAnswer: 1,
+    explanation: "One of the primary functions of the liver is to filter and detoxify chemicals from the blood.",
+    sourceType: "original"
+  },
+  // Chemistry - Batch 4
+  {
+    id: "jamb-chem-2023-05",
+    subject: "Chemistry",
+    year: 2023,
+    examType: "JAMB",
+    question: "The pH of a neutral solution at 25 degrees Celsius is:",
+    options: ["0", "7", "14", "1"],
+    correctAnswer: 1,
+    explanation: "A neutral solution has a pH of 7.",
+    sourceType: "original"
+  },
+  {
+    id: "waec-chem-2023-03",
+    subject: "Chemistry",
+    year: 2023,
+    examType: "WAEC",
+    question: "Which of the following is a noble gas?",
+    options: ["Nitrogen", "Oxygen", "Helium", "Hydrogen"],
+    correctAnswer: 2,
+    explanation: "Helium is a noble gas (Group 18).",
+    sourceType: "original"
+  },
+  // Physics - Batch 4
+  {
+    id: "jamb-phy-2023-03",
+    subject: "Physics",
+    year: 2023,
+    examType: "JAMB",
+    question: "The rate of change of displacement is called:",
+    options: ["Speed", "Velocity", "Acceleration", "Momentum"],
+    correctAnswer: 1,
+    explanation: "Velocity is the rate of change of displacement with respect to time.",
+    sourceType: "original"
+  },
+  {
+    id: "waec-phy-2023-05",
+    subject: "Physics",
+    year: 2023,
+    examType: "WAEC",
+    question: "The instrument used to measure atmospheric pressure is the:",
+    options: ["Thermometer", "Hygrometer", "Barometer", "Anemometer"],
+    correctAnswer: 2,
+    explanation: "A barometer is a scientific instrument used to measure air pressure in a certain environment.",
+    sourceType: "original"
+  },
+  // Government - Batch 4
+  {
+    id: "jamb-gov-2023-03",
+    subject: "Government",
+    year: 2023,
+    examType: "JAMB",
+    question: "The rule of law means:",
+    options: ["The law is supreme", "The government is supreme", "The police are supreme", "The military is supreme"],
+    correctAnswer: 0,
+    explanation: "The rule of law is the principle that all people and institutions are subject to and accountable to law that is fairly applied and enforced.",
+    sourceType: "original"
+  },
+  {
+    id: "waec-gov-2023-05",
+    subject: "Government",
+    year: 2023,
+    examType: "WAEC",
+    question: "A bicameral legislature consists of:",
+    options: ["One house", "Two houses", "Three houses", "Four houses"],
+    correctAnswer: 1,
+    explanation: "A bicameral legislature is a legislative body with two houses or chambers.",
+    sourceType: "original"
+  },
+  // Economics - Batch 4
+  {
+    id: "jamb-eco-2023-05",
+    subject: "Economics",
+    year: 2023,
+    examType: "JAMB",
+    question: "The demand for a commodity is said to be elastic if:",
+    options: ["Price changes lead to a smaller change in quantity demanded", "Price changes lead to a larger change in quantity demanded", "Price changes lead to no change in quantity demanded", "Quantity demanded changes regardless of price"],
+    correctAnswer: 1,
+    explanation: "Elastic demand means that the quantity demanded is highly sensitive to changes in price.",
+    sourceType: "original"
+  },
+  {
+    id: "waec-eco-2023-03",
+    subject: "Economics",
+    year: 2023,
+    examType: "WAEC",
+    question: "The central bank of Nigeria was established in:",
+    options: ["1958", "1960", "1963", "1970"],
+    correctAnswer: 0,
+    explanation: "The Central Bank of Nigeria (CBN) was established by the CBN Act of 1958 and commenced operations on July 1, 1959.",
+    sourceType: "original"
+  },
+  // Literature - Batch 4
+  {
+    id: "jamb-lit-2023-03",
+    subject: "Literature",
+    year: 2023,
+    examType: "JAMB",
+    question: "A figure of speech in which an inanimate object is given human qualities is:",
+    options: ["Simile", "Metaphor", "Personification", "Alliteration"],
+    correctAnswer: 2,
+    explanation: "Personification is the attribution of a personal nature or human characteristics to something non-human.",
+    sourceType: "original"
+  },
+  {
+    id: "waec-lit-2023-05",
+    subject: "Literature",
+    year: 2023,
+    examType: "WAEC",
+    question: "The person who tells the story in a novel is the:",
+    options: ["Author", "Protagonist", "Narrator", "Antagonist"],
+    correctAnswer: 2,
+    explanation: "The narrator is the person who tells the story, which may or may not be a character in the story.",
+    sourceType: "original"
   }
 ];
