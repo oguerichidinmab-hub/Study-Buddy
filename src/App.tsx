@@ -176,8 +176,8 @@ const Quiz = ({ subject, educationLevel, targetExams, cachedQuestions, onCacheQu
           <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Question {currentQuestion + 1} of {questions.length}</p>
           <h3 className="text-lg font-bold">{subject} Practice</h3>
         </div>
-        <button onClick={onCancel} className="p-2 hover:bg-zinc-100 rounded-full transition-colors">
-          <X size={20} />
+        <button onClick={onCancel} className="p-2 hover:bg-zinc-100 rounded-full transition-colors flex items-center gap-2 text-zinc-500 font-bold text-xs">
+          <X size={20} /> Quit Quiz
         </button>
       </div>
 
