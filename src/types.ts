@@ -23,8 +23,63 @@ export interface UserProfile {
   practiceGoals?: PracticeGoal[];
   studyStartTime?: string;
   studyEndTime?: string;
-  achievements: string[];
+  achievements: Achievement[];
   createdAt: string;
+  points: number;
+  rank: number;
+  friends: Friend[];
+  groups: string[]; // Group IDs
+  dailyGoals: DailyGoal[];
+  notifications: Notification[];
+  studyTips: StudyTip[];
+}
+
+export interface Achievement {
+  id: string;
+  title: string;
+  description: string;
+  icon: string;
+  completed: boolean;
+  progress: number;
+  target: number;
+}
+
+export interface Friend {
+  uid: string;
+  displayName: string;
+  status: 'online' | 'offline' | 'studying';
+  points: number;
+  avatar?: string;
+}
+
+export interface DailyGoal {
+  id: string;
+  title: string;
+  completed: boolean;
+}
+
+export interface Notification {
+  id: string;
+  title: string;
+  message: string;
+  type: 'quiz' | 'challenge' | 'result' | 'general';
+  timestamp: string;
+  read: boolean;
+}
+
+export interface StudyTip {
+  id: string;
+  tip: string;
+  completed: boolean;
+}
+
+export interface StudyGroup {
+  id: string;
+  name: string;
+  description: string;
+  members: number;
+  icon: string;
+  joined: boolean;
 }
 
 export interface ScheduleBlock {

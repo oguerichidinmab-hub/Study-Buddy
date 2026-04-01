@@ -7,7 +7,11 @@ import {
   User,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
-  signOut
+  signOut,
+  updatePassword,
+  reauthenticateWithCredential,
+  EmailAuthProvider,
+  sendPasswordResetEmail
 } from 'firebase/auth';
 import { getFirestore, doc, getDoc, setDoc, collection, query, where, onSnapshot, getDocFromServer, FirestoreError } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
@@ -91,6 +95,10 @@ export {
   onAuthStateChanged,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
-  signOut
+  signOut,
+  updatePassword,
+  reauthenticateWithCredential,
+  EmailAuthProvider,
+  sendPasswordResetEmail
 };
 export type { User };

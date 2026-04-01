@@ -6,7 +6,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   auth, db, googleProvider, signInWithPopup, onAuthStateChanged, User, 
-  handleFirestoreError, OperationType, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut 
+  handleFirestoreError, OperationType, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut,
+  updatePassword, reauthenticateWithCredential, EmailAuthProvider, sendPasswordResetEmail
 } from './firebase';
 import { 
   doc, getDoc, setDoc, updateDoc, collection, query, where, onSnapshot, addDoc, serverTimestamp, Timestamp 
@@ -14,259 +15,322 @@ import {
 import { 
   BookOpen, Calendar, CheckCircle, Clock, LayoutDashboard, LogOut, 
   MessageSquare, Play, Plus, Settings, User as UserIcon, Zap, 
-  Award, Brain, Coffee, Moon, Sun, Target, TrendingUp, X,
+  Award, Brain, Coffee, Moon, Sun, Target, TrendingUp, X, Lightbulb,
   ChevronRight, ArrowLeft, RefreshCw, Sparkles, Volume2, Accessibility, Users, Info, Timer, AlertTriangle, ExternalLink
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { io, Socket } from "socket.io-client";
+
+// Initialize socket
+const socket: Socket = io();
 import { UserProfile, Schedule, ScheduleBlock, StudySession, QuizResult, ExamQuestion } from './types';
-import { generateTimetable, getBuddyMessage, generateQuiz } from './services/geminiService';
+import { generateTimetable, getBuddyMessage, generateQuiz, createBuddyChat } from './services/geminiService';
 import { PRACTICE_QUESTIONS } from './data/practiceQuestions';
 
 // --- Components ---
 
 const Button = ({ children, onClick, variant = 'primary', className = '', disabled = false, icon: Icon }: any) => {
   const variants: any = {
-    primary: 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm',
-    secondary: 'bg-white text-zinc-900 border border-zinc-200 hover:bg-zinc-50 shadow-sm',
-    ghost: 'bg-transparent text-zinc-600 hover:bg-zinc-100',
-    danger: 'bg-red-50 text-red-600 hover:bg-red-100',
-    accent: 'bg-violet-600 text-white hover:bg-violet-700 shadow-sm',
+    primary: 'bg-brand-primary text-white hover:bg-brand-primary/90 shadow-lg shadow-brand-primary/20',
+    secondary: 'bg-bg-card text-text-primary border border-slate-700 hover:bg-slate-800',
+    ghost: 'bg-transparent text-text-secondary hover:bg-white/5',
+    danger: 'bg-red-500/10 text-red-500 hover:bg-red-500/20',
+    accent: 'bg-brand-secondary text-white hover:bg-brand-secondary/90 shadow-lg shadow-brand-secondary/20',
+    pink: 'bg-brand-accent text-white hover:bg-brand-accent/90 shadow-lg shadow-brand-accent/20',
   };
 
   return (
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-all active:scale-95 disabled:opacity-50 disabled:pointer-events-none ${variants[variant]} ${className}`}
+      className={`flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl font-bold transition-all active:scale-95 disabled:opacity-50 disabled:pointer-events-none ${variants[variant]} ${className}`}
     >
-      {Icon && <Icon size={18} />}
+      {Icon && <Icon size={20} />}
       {children}
     </button>
   );
 };
 
-const Card = ({ children, className = '', id }: any) => (
-  <div id={id} className={`bg-white border border-zinc-100 rounded-2xl p-5 shadow-sm ${className}`}>
+const Card = ({ children, className = '', id, onClick }: any) => (
+  <div 
+    id={id} 
+    onClick={onClick}
+    className={`bg-bg-card border border-slate-800 rounded-[2rem] p-6 shadow-xl ${onClick ? 'cursor-pointer active:scale-[0.98] transition-transform' : ''} ${className}`}
+  >
     {children}
   </div>
 );
 
 const Badge = ({ children, color = 'emerald' }: any) => {
   const colors: any = {
-    emerald: 'bg-emerald-50 text-emerald-700 border-emerald-100',
-    violet: 'bg-violet-50 text-violet-700 border-violet-100',
-    amber: 'bg-amber-50 text-amber-700 border-amber-100',
-    zinc: 'bg-zinc-50 text-zinc-700 border-zinc-100',
+    emerald: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+    violet: 'bg-violet-500/10 text-violet-400 border-violet-500/20',
+    amber: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+    rose: 'bg-rose-500/10 text-rose-400 border-rose-500/20',
+    blue: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
   };
   return (
-    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${colors[color]}`}>
+    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${colors[color]}`}>
       {children}
     </span>
   );
 };
 
-const Quiz = ({ subject, educationLevel, targetExams, cachedQuestions, onCacheQuestions, onComplete, onCancel }: any) => {
-  const [questions, setQuestions] = useState<any[]>(cachedQuestions || []);
-  const [currentQuestion, setCurrentQuestion] = useState(0);
-  const [score, setScore] = useState(0);
-  const [loading, setLoading] = useState(!cachedQuestions);
-  const [finished, setFinished] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(600); // 10 minutes (600 seconds)
-  const [isTimeUp, setIsTimeUp] = useState(false);
-  const [selectedOption, setSelectedOption] = useState<number | null>(null);
-  const [showFeedback, setShowFeedback] = useState(false);
-
-  useEffect(() => {
-    if (cachedQuestions) return;
-    
-    const fetchQuiz = async () => {
-      setLoading(true);
-      try {
-        const q = await generateQuiz(subject, educationLevel, targetExams);
-        setQuestions(q);
-        onCacheQuestions(q);
-      } catch (error) {
-        console.error("Quiz generation failed:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchQuiz();
-  }, [subject, educationLevel, targetExams, cachedQuestions]);
-
-  useEffect(() => {
-    if (loading || finished || questions.length === 0) return;
-
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          setIsTimeUp(true);
-          setFinished(true);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [loading, finished, questions.length]);
-
-  const handleAnswer = (idx: number) => {
-    if (showFeedback) return;
-    setSelectedOption(idx);
-    setShowFeedback(true);
-    if (idx === questions[currentQuestion].correctAnswer) {
-      setScore(s => s + 1);
-    }
-  };
-
-  const nextQuestion = () => {
-    setShowFeedback(false);
-    setSelectedOption(null);
-    if (currentQuestion < questions.length - 1) {
-      setCurrentQuestion(c => c + 1);
-    } else {
-      setFinished(true);
-    }
-  };
-
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  if (loading) {
-    return (
-      <div className="fixed inset-0 bg-white z-[100] flex flex-col p-6 overflow-hidden">
-        <div className="flex justify-between items-center mb-12">
-          <div className="space-y-2">
-            <div className="h-2 w-24 bg-zinc-100 rounded-full animate-pulse" />
-            <div className="h-6 w-48 bg-zinc-100 rounded-lg animate-pulse" />
+const Dashboard = ({ user, onAction }: any) => {
+  return (
+    <div className="flex-1 overflow-y-auto pb-32">
+      <div className="p-6 space-y-8">
+        {/* Header */}
+        <div className="flex justify-between items-center">
+          <div>
+            <h2 className="text-3xl font-black">Hi, {user?.displayName?.split(' ')[0]}!</h2>
+            <p className="text-text-secondary font-bold">Ready for today's session?</p>
           </div>
-          <div className="w-10 h-10 bg-zinc-50 rounded-full animate-pulse" />
+          <button onClick={() => onAction('notifications')} className="w-12 h-12 bg-bg-card border border-slate-800 rounded-2xl flex items-center justify-center relative">
+            <Bell size={24} />
+            {user?.notifications?.some((n: any) => !n.read) && (
+              <span className="absolute top-3 right-3 w-3 h-3 bg-brand-accent rounded-full border-2 border-bg-dark" />
+            )}
+          </button>
         </div>
-        
-        <div className="flex-1 max-w-2xl mx-auto w-full space-y-8">
-          <div className="space-y-4">
-            <div className="h-8 w-full bg-zinc-100 rounded-xl animate-pulse" />
-            <div className="h-8 w-3/4 bg-zinc-100 rounded-xl animate-pulse" />
+
+        {/* Buddy Card */}
+        <Card className="bg-brand-primary text-white p-6 relative overflow-hidden">
+          <div className="relative z-10">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                <Brain size={24} />
+              </div>
+              <span className="font-black uppercase tracking-widest text-xs">Ace • Your Buddy</span>
+            </div>
+            <p className="text-xl font-bold mb-6 leading-tight">"You're doing great! Let's tackle that Math quiz today."</p>
+            <Button variant="secondary" className="bg-white text-brand-primary border-none" onClick={() => onAction('chat')}>
+              Chat with Ace
+            </Button>
           </div>
-          
+          <div className="absolute -right-8 -bottom-8 opacity-10 rotate-12">
+            <Brain size={160} />
+          </div>
+        </Card>
+
+        {/* Quick Actions */}
+        <div className="grid grid-cols-2 gap-4">
+          <Card onClick={() => onAction('focus')} className="p-6 flex flex-col items-center text-center gap-3">
+            <div className="w-12 h-12 bg-brand-accent/20 text-brand-accent rounded-2xl flex items-center justify-center">
+              <Timer size={24} />
+            </div>
+            <span className="font-black">Focus Mode</span>
+          </Card>
+          <Card onClick={() => onAction('quiz')} className="p-6 flex flex-col items-center text-center gap-3">
+            <div className="w-12 h-12 bg-brand-primary/20 text-brand-primary rounded-2xl flex items-center justify-center">
+              <Zap size={24} />
+            </div>
+            <span className="font-black">Quick Quiz</span>
+          </Card>
+        </div>
+
+        {/* Daily Goals */}
+        <div className="space-y-4">
+          <div className="flex justify-between items-center">
+            <h3 className="text-xl font-black">Daily Goals</h3>
+            <button onClick={() => onAction('goals')} className="text-brand-primary font-bold text-sm">View All</button>
+          </div>
           <div className="space-y-3">
-            {[1, 2, 3, 4].map(i => (
-              <div key={i} className="h-16 w-full bg-zinc-50 rounded-2xl border border-zinc-100 animate-pulse" />
+            {user?.dailyGoals?.slice(0, 2).map((goal: any) => (
+              <Card key={goal.id} className="p-4 flex items-center gap-4">
+                <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center ${goal.completed ? 'bg-brand-primary border-brand-primary text-white' : 'border-slate-700'}`}>
+                  {goal.completed && <Check size={14} />}
+                </div>
+                <span className={`font-bold flex-1 ${goal.completed ? 'text-text-secondary line-through' : ''}`}>{goal.title}</span>
+              </Card>
             ))}
           </div>
         </div>
-        
-        <div className="flex flex-col items-center justify-center absolute inset-0 pointer-events-none">
-          <motion.div 
-            animate={{ rotate: 360 }} 
-            transition={{ repeat: Infinity, duration: 1.5, ease: 'linear' }} 
-            className="mb-4"
-          >
-            <RefreshCw className="text-emerald-600 opacity-20" size={48} />
-          </motion.div>
-          <p className="text-zinc-400 font-bold text-[10px] uppercase tracking-widest animate-pulse">Ace is crafting your quiz...</p>
-        </div>
-      </div>
-    );
-  }
 
-  if (questions.length === 0) {
-    return (
-      <div className="fixed inset-0 bg-white z-[100] flex flex-col items-center justify-center p-6 text-center">
-        <div className="w-20 h-20 bg-zinc-50 rounded-3xl flex items-center justify-center text-zinc-300 mb-6">
-          <BookOpen size={40} />
-        </div>
-        <h2 className="text-2xl font-bold mb-2">No Questions Found</h2>
-        <p className="text-zinc-500 mb-8">Ace couldn't generate questions for this subject right now.</p>
-        <Button variant="secondary" onClick={onCancel}>Go Back</Button>
-      </div>
-    );
-  }
-
-  if (finished) {
-    return (
-      <div className="fixed inset-0 bg-white z-[100] flex flex-col items-center justify-center p-6 text-center">
-        <div className={`w-20 h-20 ${isTimeUp ? 'bg-amber-100 text-amber-600' : 'bg-emerald-100 text-emerald-600'} rounded-3xl flex items-center justify-center mb-6`}>
-          {isTimeUp ? <Timer size={40} /> : <Award size={40} />}
-        </div>
-        <h2 className="text-3xl font-bold mb-2">{isTimeUp ? 'Time is Up!' : 'Quiz Complete!'}</h2>
-        <p className="text-zinc-500 mb-2">You scored {score} out of {questions.length}</p>
-        {isTimeUp && <p className="text-amber-600 font-bold text-sm mb-8">Quiz marked as incomplete due to timeout.</p>}
-        {!isTimeUp && <p className="text-zinc-400 text-sm mb-8">Great job finishing on time!</p>}
-        <div className="flex gap-3 w-full max-w-xs">
-          <Button className="flex-1" onClick={() => onComplete(score, questions.length)}>Finish</Button>
-        </div>
-      </div>
-    );
-  }
-
-  const q = questions[currentQuestion];
-
-  return (
-    <div className="fixed inset-0 bg-white z-[100] flex flex-col p-6 overflow-y-auto">
-      <div className="flex justify-between items-center mb-8">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Question {currentQuestion + 1} of {questions.length}</p>
-            <div className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest ${timeLeft < 60 ? 'bg-red-100 text-red-600 animate-pulse' : 'bg-zinc-100 text-zinc-600'}`}>
-              {formatTime(timeLeft)}
-            </div>
+        {/* Study Groups */}
+        <div className="space-y-4">
+          <div className="flex justify-between items-center">
+            <h3 className="text-xl font-black">Study Groups</h3>
+            <button onClick={() => onAction('groups')} className="text-brand-primary font-bold text-sm">Join New</button>
           </div>
-          <h3 className="text-lg font-bold">{subject} Practice</h3>
+          <div className="flex gap-4 overflow-x-auto pb-2 no-scrollbar">
+            {user?.groups?.map((group: any) => (
+              <Card key={group.id} className="min-w-[200px] p-4 space-y-3">
+                <div className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center">
+                  <Users size={20} />
+                </div>
+                <h4 className="font-black">{group.name}</h4>
+                <p className="text-xs text-text-secondary font-bold">{group.members} Members</p>
+              </Card>
+            ))}
+          </div>
         </div>
-        <button onClick={onCancel} className="p-2 hover:bg-zinc-100 rounded-full transition-colors flex items-center gap-2 text-zinc-500 font-bold text-xs">
-          <X size={20} /> Quit Quiz
+      </div>
+    </div>
+  );
+};
+
+const Timetable = ({ user }: any) => {
+  return (
+    <div className="flex-1 overflow-y-auto pb-32 p-6 space-y-8">
+      <div className="flex justify-between items-center">
+        <h2 className="text-3xl font-black">Timetable</h2>
+        <button className="w-12 h-12 bg-bg-card border border-slate-800 rounded-2xl flex items-center justify-center">
+          <Plus size={24} />
         </button>
       </div>
 
-      <div className="flex-1 max-w-2xl mx-auto w-full pb-24">
-        <h4 className="text-2xl font-bold mb-8 leading-tight">{q.question}</h4>
-        <div className="space-y-3">
-          {q.options.map((opt: string, idx: number) => {
-            let style = "border-zinc-100";
-            if (showFeedback) {
-              if (idx === q.correctAnswer) style = "border-emerald-500 bg-emerald-50 text-emerald-700";
-              else if (idx === selectedOption) style = "border-red-500 bg-red-50 text-red-700";
-              else style = "opacity-50";
-            }
+      <div className="flex gap-4 overflow-x-auto pb-2 no-scrollbar">
+        {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, i) => (
+          <button key={day} className={`min-w-[60px] py-4 rounded-2xl flex flex-col items-center gap-1 border-2 transition-all ${i === 0 ? 'bg-brand-primary border-brand-primary text-white' : 'bg-bg-card border-slate-800 text-text-secondary'}`}>
+            <span className="text-[10px] font-black uppercase tracking-widest">{day}</span>
+            <span className="text-lg font-black">{12 + i}</span>
+          </button>
+        ))}
+      </div>
 
-            return (
-              <button 
-                key={idx}
-                disabled={showFeedback}
-                onClick={() => handleAnswer(idx)}
-                className={`w-full p-5 text-left rounded-2xl border transition-all group flex items-center gap-4 ${style} ${!showFeedback ? 'hover:border-emerald-600 hover:bg-emerald-50' : ''}`}
-              >
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold ${showFeedback && idx === q.correctAnswer ? 'bg-emerald-600 text-white' : 'bg-zinc-50 text-zinc-400 group-hover:bg-emerald-600 group-hover:text-white transition-colors'}`}>
-                  {String.fromCharCode(65 + idx)}
-                </div>
-                <span className="font-medium">{opt}</span>
-              </button>
-            );
-          })}
+      <div className="space-y-4">
+        {[
+          { time: '09:00 AM', subject: 'Mathematics', type: 'Quiz Practice', color: 'brand-primary' },
+          { time: '11:30 AM', subject: 'Physics', type: 'Formula Review', color: 'brand-accent' },
+          { time: '02:00 PM', subject: 'Biology', type: 'Group Study', color: 'brand-pink' },
+        ].map((session, i) => (
+          <div key={i} className="flex gap-4">
+            <div className="w-20 pt-2">
+              <span className="text-xs font-black text-text-secondary">{session.time}</span>
+            </div>
+            <Card className="flex-1 p-5 border-l-8" style={{ borderLeftColor: `var(--color-${session.color})` }}>
+              <h4 className="font-black text-lg">{session.subject}</h4>
+              <p className="text-sm text-text-secondary font-bold">{session.type}</p>
+            </Card>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const Leaderboard = ({ user }: any) => {
+  const topUsers = [
+    { name: 'Alex Rivers', points: 2450, rank: 1, avatar: 'AR' },
+    { name: 'Sarah Chen', points: 2320, rank: 2, avatar: 'SC' },
+    { name: 'Marcus Bell', points: 2180, rank: 3, avatar: 'MB' },
+  ];
+
+  return (
+    <div className="flex-1 overflow-y-auto pb-32 p-6 space-y-8">
+      <h2 className="text-3xl font-black">Leaderboard</h2>
+
+      <div className="flex items-end justify-center gap-4 h-64 mb-8">
+        {/* 2nd Place */}
+        <div className="flex flex-col items-center gap-3 flex-1">
+          <div className="w-16 h-16 bg-slate-800 rounded-full border-4 border-slate-700 flex items-center justify-center font-black text-xl">SC</div>
+          <div className="w-full bg-slate-800 rounded-t-3xl h-32 flex flex-col items-center justify-center p-4">
+            <span className="font-black text-2xl">2</span>
+            <span className="text-[10px] font-black uppercase tracking-widest text-text-secondary">Sarah</span>
+          </div>
+        </div>
+        {/* 1st Place */}
+        <div className="flex flex-col items-center gap-3 flex-1">
+          <div className="w-20 h-20 bg-brand-primary/20 rounded-full border-4 border-brand-primary flex items-center justify-center font-black text-2xl relative">
+            AR
+            <div className="absolute -top-4 bg-brand-primary text-white p-1 rounded-lg">
+              <Award size={16} />
+            </div>
+          </div>
+          <div className="w-full bg-brand-primary rounded-t-3xl h-48 flex flex-col items-center justify-center p-4">
+            <span className="font-black text-3xl">1</span>
+            <span className="text-[10px] font-black uppercase tracking-widest text-white/80">Alex</span>
+          </div>
+        </div>
+        {/* 3rd Place */}
+        <div className="flex flex-col items-center gap-3 flex-1">
+          <div className="w-16 h-16 bg-slate-800 rounded-full border-4 border-slate-700 flex items-center justify-center font-black text-xl">MB</div>
+          <div className="w-full bg-slate-800 rounded-t-3xl h-24 flex flex-col items-center justify-center p-4">
+            <span className="font-black text-2xl">3</span>
+            <span className="text-[10px] font-black uppercase tracking-widest text-text-secondary">Marcus</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        {[4, 5, 6, 7, 8].map((rank) => (
+          <Card key={rank} className="p-4 flex items-center gap-4">
+            <span className="w-6 font-black text-text-secondary">{rank}</span>
+            <div className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center font-black text-xs">U{rank}</div>
+            <div className="flex-1">
+              <h4 className="font-black">Student {rank}</h4>
+              <p className="text-xs text-text-secondary font-bold">1,840 pts</p>
+            </div>
+            <div className="text-brand-primary">
+              <TrendingUp size={16} />
+            </div>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const Settings = ({ user, onAction, onLogout }: any) => {
+  return (
+    <div className="flex-1 overflow-y-auto pb-32 p-6 space-y-8">
+      <h2 className="text-3xl font-black">Settings</h2>
+
+      <div className="flex items-center gap-4 mb-8">
+        <div className="w-20 h-20 bg-brand-primary/20 text-brand-primary rounded-[2rem] flex items-center justify-center font-black text-3xl">
+          {user?.displayName?.[0]}
+        </div>
+        <div>
+          <h3 className="text-2xl font-black">{user?.displayName}</h3>
+          <p className="text-text-secondary font-bold">{user?.email}</p>
+        </div>
+      </div>
+
+      <div className="space-y-6">
+        <div className="space-y-3">
+          <h4 className="text-[10px] font-black uppercase tracking-widest text-text-secondary ml-1">Account</h4>
+          <Card onClick={() => onAction('editProfile')} className="p-4 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <User size={20} className="text-brand-primary" />
+              <span className="font-bold">Edit Profile</span>
+            </div>
+            <ChevronRight size={20} className="text-text-secondary" />
+          </Card>
+          <Card onClick={() => onAction('changePassword')} className="p-4 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Lock size={20} className="text-brand-accent" />
+              <span className="font-bold">Security</span>
+            </div>
+            <ChevronRight size={20} className="text-text-secondary" />
+          </Card>
         </div>
 
-        {showFeedback && (
-          <motion.div 
-            initial={{ opacity: 0, y: 10 }} 
-            animate={{ opacity: 1, y: 0 }} 
-            className="mt-8 p-6 bg-zinc-50 rounded-2xl border border-zinc-100"
-          >
-            <div className="flex items-center gap-2 mb-2">
-              <Info size={16} className="text-emerald-600" />
-              <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Explanation</p>
+        <div className="space-y-3">
+          <h4 className="text-[10px] font-black uppercase tracking-widest text-text-secondary ml-1">Preferences</h4>
+          <Card className="p-4 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Moon size={20} className="text-brand-pink" />
+              <span className="font-bold">Dark Mode</span>
             </div>
-            <p className="text-sm text-zinc-600 leading-relaxed mb-6">{q.explanation}</p>
-            <Button className="w-full" onClick={nextQuestion} icon={ChevronRight}>
-              {currentQuestion === questions.length - 1 ? 'See Results' : 'Next Question'}
-            </Button>
-          </motion.div>
-        )}
+            <div className="w-12 h-6 bg-brand-primary rounded-full relative">
+              <div className="absolute right-1 top-1 w-4 h-4 bg-white rounded-full" />
+            </div>
+          </Card>
+          <Card className="p-4 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Volume2 size={20} className="text-brand-primary" />
+              <span className="font-bold">Voice Assistance</span>
+            </div>
+            <div className="w-12 h-6 bg-slate-800 rounded-full relative">
+              <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full" />
+            </div>
+          </Card>
+        </div>
+
+        <Button variant="danger" className="w-full py-4 mt-8" onClick={onLogout}>
+          Log Out
+        </Button>
       </div>
     </div>
   );
@@ -608,16 +672,242 @@ const ExamPractice = ({ onCancel, onComplete }: { onCancel: () => void, onComple
 
 // --- Main App ---
 
+const BuddyChatModal = ({ profile, onClose, initialMessage }: { profile: UserProfile, onClose: () => void, initialMessage?: string }) => {
+  const [messages, setMessages] = useState<{ role: 'user' | 'model' | 'buddy', text: string, timestamp: number }[]>([]);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const chatRef = useRef<any>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const isAI = profile.buddyType === 'AI';
+  const roomId = `chat-${profile.uid}`;
+
+  useEffect(() => {
+    // Join socket room for real-time chat
+    socket.emit("join-room", roomId);
+
+    const handleReceiveMessage = (data: any) => {
+      if (data.senderId !== profile.uid) {
+        setMessages(prev => [...prev, { 
+          role: 'buddy', 
+          text: data.text, 
+          timestamp: data.timestamp 
+        }]);
+      }
+    };
+
+    socket.on("receive-message", handleReceiveMessage);
+
+    return () => {
+      socket.off("receive-message", handleReceiveMessage);
+    };
+  }, [roomId, profile.uid]);
+
+  useEffect(() => {
+    if (isAI && !chatRef.current && profile) {
+      chatRef.current = createBuddyChat(profile);
+      
+      if (initialMessage) {
+        setMessages([{ role: 'user', text: initialMessage, timestamp: Date.now() }]);
+        handleSend(initialMessage);
+      } else {
+        setMessages([{ role: 'model', text: `Hey ${profile.displayName}! I'm Ace, your study buddy. How's your studying going today?`, timestamp: Date.now() }]);
+      }
+    } else if (!isAI && messages.length === 0) {
+      setMessages([{ 
+        role: 'buddy', 
+        text: `Hey ${profile.displayName}! I'm ready to study together. Send me a message!`, 
+        timestamp: Date.now() 
+      }]);
+    }
+  }, [profile, initialMessage, isAI]);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [messages]);
+
+  const handleSend = async (customMsg?: string) => {
+    const msgToSend = customMsg || input.trim();
+    if (!msgToSend || loading) return;
+
+    const timestamp = Date.now();
+
+    if (!customMsg) {
+      setInput('');
+      setMessages(prev => [...prev, { role: 'user', text: msgToSend, timestamp }]);
+    }
+
+    // Send via socket for real-time
+    socket.emit("send-message", {
+      roomId,
+      senderId: profile.uid,
+      text: msgToSend,
+      timestamp
+    });
+    
+    if (isAI && chatRef.current) {
+      setLoading(true);
+      try {
+        const stream = await chatRef.current.sendMessageStream(msgToSend);
+        
+        // Add an empty message for the model that we will update
+        setMessages(prev => [...prev, { role: 'model', text: '', timestamp: Date.now() }]);
+        
+        let fullText = '';
+        for await (const chunk of stream) {
+          const chunkText = chunk.text || '';
+          fullText += chunkText;
+          setMessages(prev => {
+            const newMessages = [...prev];
+            const lastMsg = newMessages[newMessages.length - 1];
+            if (lastMsg && lastMsg.role === 'model') {
+              lastMsg.text = fullText;
+            }
+            return newMessages;
+          });
+        }
+      } catch (error) {
+        console.error("Chat error:", error);
+        setMessages(prev => [...prev, { role: 'model', text: "Sorry, I'm having a bit of trouble connecting. Let's try again in a moment!", timestamp: Date.now() }]);
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <motion.div 
+        initial={{ y: '100%' }} 
+        animate={{ y: 0 }} 
+        exit={{ y: '100%' }}
+        className="bg-white w-full max-w-lg h-[85vh] sm:h-[600px] rounded-t-[32px] sm:rounded-[32px] flex flex-col overflow-hidden shadow-2xl shadow-black/20"
+      >
+        <div className="p-6 border-bottom border-zinc-100 flex justify-between items-center bg-zinc-900 text-white">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-900/20">
+              <Brain size={20} />
+            </div>
+            <div>
+              <h3 className="font-bold">Chat with {profile.buddyName || (profile.buddyType === 'AI' ? 'Ace' : 'Buddy')}</h3>
+              <p className="text-[10px] text-emerald-400 font-bold uppercase tracking-widest">{profile.buddyType === 'AI' ? 'AI Study Buddy' : `${profile.buddyType} Buddy`}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-xl transition-colors">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-4 bg-zinc-50">
+          {messages.map((msg, i) => (
+            <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              <div className={`max-w-[80%] p-4 rounded-2xl text-sm shadow-sm ${
+                msg.role === 'user' 
+                  ? 'bg-emerald-600 text-white rounded-tr-none' 
+                  : 'bg-white text-zinc-900 border border-zinc-100 rounded-tl-none'
+              }`}>
+                {msg.text}
+                <div className={`text-[8px] mt-1 opacity-50 ${msg.role === 'user' ? 'text-right' : 'text-left'}`}>
+                  {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </div>
+              </div>
+            </div>
+          ))}
+          {loading && (
+            <div className="flex justify-start">
+              <div className="bg-white p-4 rounded-2xl rounded-tl-none border border-zinc-100 shadow-sm">
+                <div className="flex gap-1">
+                  <div className="w-1.5 h-1.5 bg-zinc-300 rounded-full animate-bounce" />
+                  <div className="w-1.5 h-1.5 bg-zinc-300 rounded-full animate-bounce [animation-delay:0.2s]" />
+                  <div className="w-1.5 h-1.5 bg-zinc-300 rounded-full animate-bounce [animation-delay:0.4s]" />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="p-6 bg-white border-t border-zinc-100">
+          <div className="flex gap-2">
+            <input 
+              type="text" 
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+              placeholder="Type a message..."
+              className="flex-1 p-4 bg-zinc-50 border border-zinc-100 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600 transition-all"
+            />
+            <Button 
+              onClick={handleSend} 
+              disabled={loading || !input.trim()}
+              className="p-4 aspect-square rounded-2xl"
+            >
+              <Zap size={20} />
+            </Button>
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState('welcome');
+  const [tabHistory, setTabHistory] = useState<string[]>([]);
+
+  const navigate = (tab: string) => {
+    if (tab === activeTab) return;
+    setTabHistory(prev => [...prev, activeTab]);
+    setActiveTab(tab);
+  };
+
+  const handleBack = () => {
+    if (activeQuiz) {
+      setActiveQuiz(null);
+      return;
+    }
+    if (showExamPractice) {
+      setShowExamPractice(false);
+      return;
+    }
+    if (showBuddyEdit) {
+      setShowBuddyEdit(false);
+      return;
+    }
+    if (showAbout) {
+      setShowAbout(false);
+      return;
+    }
+    if (showChangePasswordModal) {
+      setShowChangePasswordModal(false);
+      return;
+    }
+    if (isChatOpen) {
+      setIsChatOpen(false);
+      return;
+    }
+    if (isFocusMode) {
+      setIsFocusMode(false);
+      return;
+    }
+
+    if (tabHistory.length > 0) {
+      const prevTab = tabHistory[tabHistory.length - 1];
+      setTabHistory(prev => prev.slice(0, -1));
+      setActiveTab(prevTab);
+    }
+  };
   const [showAbout, setShowAbout] = useState(false);
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [currentSchedule, setCurrentSchedule] = useState<Schedule | null>(null);
-  const [buddyMessage, setBuddyMessage] = useState<string>('Hey there! Ready to start our study session?');
+  const [buddyMessage, setBuddyMessage] = useState<{ message: string, suggestions: string[] }>({ 
+    message: 'Hey there! Ready to start our study session?', 
+    suggestions: ['Yes!', 'Maybe later', 'What is the plan?'] 
+  });
   const [isBuddyLoading, setIsBuddyLoading] = useState(false);
   const [notifiedBlocks, setNotifiedBlocks] = useState<string[]>([]);
   const [quizResults, setQuizResults] = useState<QuizResult[]>([]);
@@ -636,6 +926,8 @@ export default function App() {
   const [activeSession, setActiveSession] = useState<StudySession | null>(null);
   const [activeQuiz, setActiveQuiz] = useState<any | null>(null);
   const [quizCache, setQuizCache] = useState<{ [key: string]: any[] }>({});
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [chatInitialMessage, setChatInitialMessage] = useState<string | null>(null);
   const [showExamPractice, setShowExamPractice] = useState(false);
   const [showBuddyEdit, setShowBuddyEdit] = useState(false);
   const [newSubject, setNewSubject] = useState('');
@@ -643,6 +935,32 @@ export default function App() {
   const [password, setPassword] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [showDailyGoals, setShowDailyGoals] = useState(false);
+  const [showStudyGroups, setShowStudyGroups] = useState(false);
+  const [showQuizBattle, setShowQuizBattle] = useState(false);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [showAchievements, setShowAchievements] = useState(false);
+  const [showStudyTips, setShowStudyTips] = useState(false);
+  const [showProgress, setShowProgress] = useState(false);
+  const [showPastQuestions, setShowPastQuestions] = useState(false);
+  const [showTimetable, setShowTimetable] = useState(false);
+
+  const handleResetPassword = async (customEmail?: string) => {
+    const emailToReset = customEmail || email;
+    if (!emailToReset) {
+      setToast({ title: 'Email Required', message: 'Please enter your email address to reset your password.', type: 'warning' });
+      return;
+    }
+    try {
+      await sendPasswordResetEmail(auth, emailToReset);
+      setToast({ title: 'Reset Email Sent', message: `A password reset link has been sent to ${emailToReset}. Check your inbox!`, type: 'success' });
+    } catch (error: any) {
+      console.error('Password reset error:', error);
+      setToast({ title: 'Reset Failed', message: error.message || 'Failed to send reset email.', type: 'error' });
+    }
+  };
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
 
   // --- Auth & Profile ---
 
@@ -669,7 +987,9 @@ export default function App() {
           }
         } catch (error) {
           console.error('Error fetching profile:', error);
-          handleFirestoreError(error, OperationType.GET, `users/${u.uid}`);
+          try {
+            handleFirestoreError(error, OperationType.GET, `users/${u.uid}`);
+          } catch (e) {}
         }
       } else {
         console.log('User logged out');
@@ -721,7 +1041,13 @@ export default function App() {
     }
   };
 
-  const handleLogout = () => signOut(auth);
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
+  };
 
   // --- Real-time Listeners ---
 
@@ -739,7 +1065,9 @@ export default function App() {
         setCurrentSchedule(null);
       }
     }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'schedules');
+      try {
+        handleFirestoreError(error, OperationType.LIST, 'schedules');
+      } catch (e) {}
     });
 
     return unsubscribe;
@@ -766,12 +1094,15 @@ export default function App() {
       }
     } catch (error) {
       console.error('Failed to generate schedule:', error);
+      try {
+        handleFirestoreError(error, OperationType.WRITE, 'schedules');
+      } catch (e) {}
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchBuddyMessage = useCallback(async (mood: string) => {
+  const fetchBuddyMessage = useCallback(async (type: 'motivation' | 'progress' | 'tips' = 'motivation') => {
     if (!profile) return;
     setIsBuddyLoading(true);
     
@@ -784,8 +1115,8 @@ export default function App() {
     }
 
     try {
-      const msg = await getBuddyMessage(profile, mood, progressContext);
-      setBuddyMessage(msg);
+      const resp = await getBuddyMessage(profile, type, progressContext);
+      setBuddyMessage(resp);
     } catch (error) {
       console.error("Error fetching buddy message:", error);
     } finally {
@@ -795,7 +1126,7 @@ export default function App() {
 
   useEffect(() => {
     if (profile && !buddyMessage) {
-      fetchBuddyMessage('motivated');
+      fetchBuddyMessage('motivation');
     }
   }, [profile, buddyMessage, fetchBuddyMessage]);
 
@@ -840,7 +1171,9 @@ export default function App() {
       setTimer(25 * 60);
       setIsFocusMode(false);
     } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, 'studySessions');
+      try {
+        handleFirestoreError(error, OperationType.CREATE, 'studySessions');
+      } catch (e) {}
     }
   };
 
@@ -860,7 +1193,9 @@ export default function App() {
       setNewSubject('');
       setToast({ title: 'Subject added', message: `${newSubject} has been added to your profile.`, type: 'success' });
     } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
+      try {
+        handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
+      } catch (e) {}
     } finally {
       setIsAddingSubject(false);
     }
@@ -874,7 +1209,9 @@ export default function App() {
       await updateDoc(doc(db, 'users', user.uid), { subjects: updatedSubjects });
       setProfile({ ...profile, subjects: updatedSubjects });
     } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
+      try {
+        handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
+      } catch (e) {}
     }
   };
 
@@ -929,8 +1266,12 @@ export default function App() {
   };
 
   const requestNotificationPermission = async () => {
-    const permission = await Notification.requestPermission();
-    setNotificationPermission(permission);
+    try {
+      const permission = await Notification.requestPermission();
+      setNotificationPermission(permission);
+    } catch (error) {
+      console.error('Notification permission request failed:', error);
+    }
   };
 
   const [toast, setToast] = useState<{ title: string; message: string; type: string } | null>(null);
@@ -1004,17 +1345,17 @@ export default function App() {
       console.log('Voice Command:', command);
 
       if (command.includes('home') || command.includes('dashboard')) {
-        setActiveTab('dashboard');
+        navigate('dashboard');
       } else if (command.includes('schedule')) {
-        setActiveTab('schedule');
+        navigate('schedule');
       } else if (command.includes('practice')) {
-        setActiveTab('practice');
+        navigate('practice');
       } else if (command.includes('buddy')) {
-        setActiveTab('buddy');
+        navigate('buddy');
       } else if (command.includes('award') || command.includes('achievement')) {
-        setActiveTab('achievements');
+        navigate('achievements');
       } else if (command.includes('setting')) {
-        setActiveTab('settings');
+        navigate('settings');
       } else if (command.includes('start session') || command.includes('focus')) {
         if (profile?.subjects?.[0]) {
           startSession(profile.subjects[0]);
@@ -1118,7 +1459,9 @@ export default function App() {
       setShowGoalModal(null);
       setToast({ title: 'Goal Set', message: `Goal updated for ${showGoalModal}`, type: 'success' });
     } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
+      try {
+        handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
+      } catch (e) {}
     }
   };
 
@@ -1148,7 +1491,9 @@ export default function App() {
       setProfile({ ...profile, ...buddyData });
       setShowBuddyEdit(false);
     } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
+      try {
+        handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
+      } catch (e) {}
     }
   };
 
@@ -1192,7 +1537,9 @@ export default function App() {
         return newCache;
       });
     } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, 'quizResults');
+      try {
+        handleFirestoreError(error, OperationType.CREATE, 'quizResults');
+      } catch (e) {}
     }
   };
 
@@ -1202,26 +1549,27 @@ export default function App() {
     const percentage = (score / total) * 100;
     let adjustmentMessage = '';
 
-    // Simple logic: 
-    // < 50% -> Increase study time (Poor performance)
-    // > 80% -> Decrease study time slightly (Strong performance)
-    
-    if (percentage < 50) {
-      adjustmentMessage = `Ace noticed you're struggling with ${subject}. I've increased its study time in your next schedule.`;
-      // In a real app, we'd update the profile's weaknesses or a specific weight for the AI generator
-      const newWeaknesses = Array.from(new Set([...(profile.weaknesses || []), subject]));
-      await updateDoc(doc(db, 'users', user.uid), { weaknesses: newWeaknesses });
-    } else if (percentage > 85) {
-      adjustmentMessage = `Great job in ${subject}! You're mastering this. I'll focus more on other subjects for now.`;
-      const newStrengths = Array.from(new Set([...(profile.strengths || []), subject]));
-      const newWeaknesses = (profile.weaknesses || []).filter(w => w !== subject);
-      await updateDoc(doc(db, 'users', user.uid), { strengths: newStrengths, weaknesses: newWeaknesses });
-    }
+    try {
+      if (percentage < 50) {
+        adjustmentMessage = `Ace noticed you're struggling with ${subject}. I've increased its study time in your next schedule.`;
+        const newWeaknesses = Array.from(new Set([...(profile.weaknesses || []), subject]));
+        await updateDoc(doc(db, 'users', user.uid), { weaknesses: newWeaknesses });
+      } else if (percentage > 85) {
+        adjustmentMessage = `Great job in ${subject}! You're mastering this. I'll focus more on other subjects for now.`;
+        const newStrengths = Array.from(new Set([...(profile.strengths || []), subject]));
+        const newWeaknesses = (profile.weaknesses || []).filter(w => w !== subject);
+        await updateDoc(doc(db, 'users', user.uid), { strengths: newStrengths, weaknesses: newWeaknesses });
+      }
 
-    if (adjustmentMessage) {
-      setToast({ title: 'Ace Recommendation', message: adjustmentMessage, type: 'info' });
-      // Trigger a schedule regeneration to reflect changes
-      handleGenerateSchedule();
+      if (adjustmentMessage) {
+        setToast({ title: 'Ace Recommendation', message: adjustmentMessage, type: 'info' });
+        handleGenerateSchedule();
+      }
+    } catch (error) {
+      console.error('Failed to adjust timetable:', error);
+      try {
+        handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
+      } catch (e) {}
     }
   };
 
@@ -1323,7 +1671,18 @@ export default function App() {
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-2">Password</label>
+                <div className="flex justify-between items-center mb-2">
+                  <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Password</label>
+                  {!isSignUp && (
+                    <button 
+                      type="button"
+                      onClick={() => handleResetPassword()}
+                      className="text-[10px] font-bold text-emerald-600 hover:underline"
+                    >
+                      Forgot Password?
+                    </button>
+                  )}
+                </div>
                 <input 
                   type="password" 
                   value={password}
@@ -1372,13 +1731,26 @@ export default function App() {
     return <Onboarding profile={profile} onComplete={(p: any) => { setProfile(p); setShowOnboarding(false); }} user={user} />;
   }
 
+  const isPasswordUser = user?.providerData.some(p => p.providerId === 'password');
+
   return (
     <div className={`min-h-screen bg-zinc-50 pb-32 lg:pb-0 lg:pl-64 pt-20 ${accessibilitySettings.highContrast ? 'contrast-125' : ''} ${accessibilitySettings.largeText ? 'text-lg' : ''}`}>
       {/* Top Bar / Quick Menu */}
       <header className="fixed top-0 left-0 right-0 h-16 bg-white/90 backdrop-blur-md border-b border-zinc-100 z-40 lg:left-64 flex items-center justify-between px-6 shadow-sm">
-        <div className="flex items-center gap-2 lg:hidden">
-          <Sparkles className="text-emerald-600" size={20} />
-          <span className="font-bold text-lg">Study Buddy</span>
+        <div className="flex items-center gap-3">
+          {(tabHistory.length > 0 || activeQuiz || showExamPractice || showBuddyEdit || showAbout || showChangePasswordModal || isChatOpen || isFocusMode) && (
+            <button 
+              onClick={handleBack}
+              className="p-2 -ml-2 text-zinc-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
+              title="Go Back"
+            >
+              <ArrowLeft size={20} />
+            </button>
+          )}
+          <div className="flex items-center gap-2 lg:hidden">
+            <Sparkles className="text-emerald-600" size={20} />
+            <span className="font-bold text-lg">Study Buddy</span>
+          </div>
         </div>
         <div className="hidden lg:block" />
         <div className="flex items-center gap-2">
@@ -1411,7 +1783,7 @@ export default function App() {
             <Info size={20} />
           </button>
           <button 
-            onClick={() => setActiveTab('settings')}
+            onClick={() => navigate('settings')}
             className="p-2 text-zinc-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
             title="Settings"
           >
@@ -1430,20 +1802,10 @@ export default function App() {
         </div>
 
         <div className="flex lg:flex-col gap-1 w-full">
-          <NavButton active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={LayoutDashboard} label="Home" />
-          <NavButton active={activeTab === 'schedule'} onClick={() => setActiveTab('schedule')} icon={Calendar} label="Schedule" />
-          <NavButton active={activeTab === 'practice'} onClick={() => setActiveTab('practice')} icon={BookOpen} label="Practice" />
-          <NavButton active={activeTab === 'buddy'} onClick={() => setActiveTab('buddy')} icon={MessageSquare} label="Buddy" />
-          <NavButton active={activeTab === 'achievements'} onClick={() => setActiveTab('achievements')} icon={Award} label="Awards" />
-          <NavButton active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} icon={Settings} label="Settings" />
-          <button 
-            onClick={handleVoiceCommand}
-            className={`flex flex-col lg:flex-row items-center gap-1 lg:gap-3 px-2 sm:px-4 py-3 rounded-xl transition-all w-full ${isListening ? 'text-emerald-600 bg-emerald-50' : 'text-zinc-400 hover:text-zinc-600 hover:bg-zinc-50'}`}
-            aria-label="Voice Command"
-          >
-            <Volume2 size={20} className={isListening ? 'animate-pulse' : ''} />
-            <span className="text-[10px] lg:text-sm font-bold lg:font-medium uppercase lg:capitalize tracking-widest lg:tracking-normal">Voice</span>
-          </button>
+          <NavButton active={activeTab === 'dashboard'} onClick={() => navigate('dashboard')} icon={LayoutDashboard} label="Home" />
+          <NavButton active={activeTab === 'practice'} onClick={() => navigate('practice')} icon={BookOpen} label="Practice" />
+          <NavButton active={activeTab === 'buddy'} onClick={() => navigate('buddy')} icon={MessageSquare} label="Buddy" />
+          <NavButton active={activeTab === 'settings'} onClick={() => navigate('settings')} icon={Settings} label="Settings" />
         </div>
 
         <div className="hidden lg:flex flex-col gap-4 w-full mt-auto px-4">
@@ -1581,7 +1943,7 @@ export default function App() {
                     <Button className="flex-1" icon={Play} onClick={() => startSession('Mathematics')}>
                       Start Focus Session
                     </Button>
-                    <Button variant="secondary" icon={ChevronRight} onClick={() => setActiveTab('schedule')}>
+                    <Button variant="secondary" icon={ChevronRight} onClick={() => navigate('schedule')}>
                       View Schedule
                     </Button>
                   </div>
@@ -1848,7 +2210,13 @@ export default function App() {
                       </div>
                       <div>
                         <h3 className="text-xl font-bold">{profile?.buddyName || 'My Buddy'}</h3>
-                        <p className="text-emerald-400 text-[10px] font-bold uppercase tracking-widest">{profile?.buddyType} Buddy</p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-emerald-400 text-[10px] font-bold uppercase tracking-widest">{profile?.buddyType} Buddy</p>
+                          <div className="flex items-center gap-1 bg-emerald-500/20 px-1.5 py-0.5 rounded-full">
+                            <div className="w-1 h-1 bg-emerald-500 rounded-full animate-pulse" />
+                            <span className="text-[8px] text-emerald-400 font-bold uppercase tracking-widest">Real-time</span>
+                          </div>
+                        </div>
                       </div>
                     </div>
                     <div className="flex gap-2">
@@ -1867,28 +2235,63 @@ export default function App() {
                     
                     <div className="space-y-6 mb-8">
                       <div className="bg-white/5 rounded-2xl p-4">
-                        <p className="text-zinc-300 italic text-sm">
-                          {isBuddyLoading ? "Ace is thinking..." : `"${buddyMessage}"`}
+                        <p className="text-zinc-300 italic text-sm mb-4">
+                          {isBuddyLoading ? "Ace is thinking..." : `"${buddyMessage.message}"`}
                         </p>
+                        {!isBuddyLoading && buddyMessage.suggestions && buddyMessage.suggestions.length > 0 && (
+                          <div className="flex flex-wrap gap-2">
+                            {buddyMessage.suggestions.map((suggestion, i) => (
+                              <button 
+                                key={i}
+                                onClick={() => {
+                                  setChatInitialMessage(suggestion);
+                                  setIsChatOpen(true);
+                                }}
+                                className="px-3 py-1 bg-white/10 hover:bg-white/20 rounded-full text-[10px] text-zinc-300 transition-colors"
+                              >
+                                {suggestion}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
 
-                      <div className="flex gap-3">
+                      <div className="grid grid-cols-2 gap-3">
                         <Button 
-                          className="flex-1 text-xs py-2" 
+                          className="flex-1 text-[10px] py-2 px-1" 
                           variant="secondary" 
-                          icon={MessageSquare}
-                          onClick={() => fetchBuddyMessage('motivated')}
+                          icon={Zap}
+                          onClick={() => fetchBuddyMessage('motivation')}
                           disabled={isBuddyLoading}
                         >
-                          Check-in
+                          Motivate Me
                         </Button>
                         <Button 
-                          className="flex-1 text-xs py-2" 
-                          icon={RefreshCw}
-                          onClick={() => fetchBuddyMessage('tired')}
+                          className="flex-1 text-[10px] py-2 px-1" 
+                          variant="secondary"
+                          icon={Target}
+                          onClick={() => fetchBuddyMessage('progress')}
                           disabled={isBuddyLoading}
                         >
-                          Get Advice
+                          Check Progress
+                        </Button>
+                        <Button 
+                          className="flex-1 text-[10px] py-2 px-1" 
+                          variant="secondary"
+                          icon={Lightbulb}
+                          onClick={() => fetchBuddyMessage('tips')}
+                          disabled={isBuddyLoading}
+                        >
+                          Study Tips
+                        </Button>
+                        <Button 
+                          className="flex-1 text-[10px] py-2 px-1" 
+                          variant="secondary"
+                          icon={RefreshCw}
+                          onClick={() => fetchBuddyMessage('motivation')}
+                          disabled={isBuddyLoading}
+                        >
+                          Refresh
                         </Button>
                       </div>
 
@@ -1917,9 +2320,9 @@ export default function App() {
                     <Button 
                       className="w-full bg-emerald-600 hover:bg-emerald-700 border-none" 
                       icon={MessageSquare}
-                      onClick={() => alert(profile?.buddyType === 'AI' ? "Ace: I'm ready when you are! Let's keep studying." : `Contacting ${profile?.buddyName}...`)}
+                      onClick={() => setIsChatOpen(true)}
                     >
-                      {profile?.buddyType === 'AI' ? 'Chat with Ace' : `Contact ${profile?.buddyName}`}
+                      {profile?.buddyType === 'AI' ? 'Chat with Ace' : `Chat with ${profile?.buddyName || 'Buddy'}`}
                     </Button>
                   </div>
                   <Sparkles className="absolute -right-8 -bottom-8 text-white/5" size={160} />
@@ -2012,6 +2415,9 @@ export default function App() {
                                   setProfile(updated);
                                 } catch (err) {
                                   console.error("Failed to update name:", err);
+                                  try {
+                                    handleFirestoreError(err, OperationType.UPDATE, `users/${profile.uid}`);
+                                  } catch (e) {}
                                 }
                               }
                             }}
@@ -2082,8 +2488,15 @@ export default function App() {
                           onChange={async (e) => {
                             const val = e.target.value;
                             if (user && profile) {
-                              await updateDoc(doc(db, 'users', user.uid), { studyStartTime: val });
-                              setProfile({ ...profile, studyStartTime: val });
+                              try {
+                                await updateDoc(doc(db, 'users', user.uid), { studyStartTime: val });
+                                setProfile({ ...profile, studyStartTime: val });
+                              } catch (err) {
+                                console.error("Failed to update study start time:", err);
+                                try {
+                                  handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}`);
+                                } catch (e) {}
+                              }
                             }
                           }}
                           className="w-full bg-transparent font-bold focus:outline-none"
@@ -2097,8 +2510,15 @@ export default function App() {
                           onChange={async (e) => {
                             const val = e.target.value;
                             if (user && profile) {
-                              await updateDoc(doc(db, 'users', user.uid), { studyEndTime: val });
-                              setProfile({ ...profile, studyEndTime: val });
+                              try {
+                                await updateDoc(doc(db, 'users', user.uid), { studyEndTime: val });
+                                setProfile({ ...profile, studyEndTime: val });
+                              } catch (err) {
+                                console.error("Failed to update study end time:", err);
+                                try {
+                                  handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}`);
+                                } catch (e) {}
+                              }
                             }
                           }}
                           className="w-full bg-transparent font-bold focus:outline-none"
@@ -2174,6 +2594,18 @@ export default function App() {
                           <div className="absolute left-1 top-1 w-3 h-3 bg-white rounded-full shadow-sm" />
                         </div>
                       </div>
+                      {isPasswordUser && (
+                        <div className="pt-2 border-t border-zinc-50">
+                          <Button 
+                            variant="secondary" 
+                            className="w-full text-xs py-2" 
+                            onClick={() => setShowChangePasswordModal(true)}
+                            icon={Zap}
+                          >
+                            Change Password
+                          </Button>
+                        </div>
+                      )}
                     </Card>
                   </section>
                   
@@ -2347,24 +2779,291 @@ export default function App() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Buddy Chat Modal */}
+      <AnimatePresence>
+        {isChatOpen && profile && (
+          <BuddyChatModal 
+            profile={profile} 
+            onClose={() => {
+              setIsChatOpen(false);
+              setChatInitialMessage(null);
+            }} 
+            initialMessage={chatInitialMessage || undefined}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Change Password Modal */}
+      <AnimatePresence>
+        {showChangePasswordModal && (
+          <ChangePasswordModal onClose={() => setShowChangePasswordModal(false)} />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
 
+const ChangePasswordModal = ({ onClose }: { onClose: () => void }) => {
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
+
+  const handleUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword !== confirmPassword) {
+      setError("Passwords do not match");
+      return;
+    }
+    if (newPassword.length < 6) {
+      setError("Password must be at least 6 characters");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      if (!auth.currentUser) throw new Error("No user logged in");
+
+      // Firebase often requires re-authentication for sensitive operations
+      const credential = EmailAuthProvider.credential(auth.currentUser.email!, currentPassword);
+      await reauthenticateWithCredential(auth.currentUser, credential);
+      await updatePassword(auth.currentUser, newPassword);
+      
+      setSuccess(true);
+      setTimeout(() => onClose(), 2000);
+    } catch (err: any) {
+      console.error("Password update error:", err);
+      if (err.code === 'auth/wrong-password') {
+        setError("Current password is incorrect");
+      } else if (err.code === 'auth/requires-recent-login') {
+        setError("Please sign out and sign in again to update your password");
+      } else {
+        setError(err.message || "Failed to update password");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4"
+    >
+      <motion.div 
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.9, opacity: 0 }}
+        className="max-w-md w-full"
+      >
+        <Card className="p-8">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-xl font-bold">Change Password</h2>
+            <button onClick={onClose} className="text-zinc-400 hover:text-zinc-600"><X size={20} /></button>
+          </div>
+
+          {success ? (
+            <div className="text-center py-8">
+              <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <CheckCircle size={32} />
+              </div>
+              <p className="font-bold text-emerald-700">Password Updated!</p>
+              <p className="text-sm text-zinc-500">Closing in a moment...</p>
+            </div>
+          ) : resetSent ? (
+            <div className="text-center py-8">
+              <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Sparkles size={32} />
+              </div>
+              <p className="font-bold text-emerald-700">Reset Email Sent!</p>
+              <p className="text-sm text-zinc-500 mb-6">Check your inbox to reset your password.</p>
+              <Button variant="secondary" onClick={onClose} className="w-full">Close</Button>
+            </div>
+          ) : (
+            <form onSubmit={handleUpdate} className="space-y-4">
+              {error && (
+                <div className="p-3 bg-red-50 border border-red-100 rounded-xl text-red-600 text-xs font-medium">
+                  {error}
+                </div>
+              )}
+              
+              <div>
+                <div className="flex justify-between items-center mb-2">
+                  <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Current Password</label>
+                  <button 
+                    type="button"
+                    onClick={async () => {
+                      if (!auth.currentUser?.email) return;
+                      try {
+                        await sendPasswordResetEmail(auth, auth.currentUser.email);
+                        setResetSent(true);
+                      } catch (err: any) {
+                        setError(err.message || "Failed to send reset email");
+                      }
+                    }}
+                    className="text-[10px] font-bold text-emerald-600 hover:underline"
+                  >
+                    Forgot Password?
+                  </button>
+                </div>
+                <input 
+                  type="password" 
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full p-3 rounded-xl border border-zinc-100 text-sm focus:outline-none focus:border-emerald-600"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-2">New Password</label>
+                <input 
+                  type="password" 
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full p-3 rounded-xl border border-zinc-100 text-sm focus:outline-none focus:border-emerald-600"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-2">Confirm New Password</label>
+                <input 
+                  type="password" 
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full p-3 rounded-xl border border-zinc-100 text-sm focus:outline-none focus:border-emerald-600"
+                  required
+                />
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <Button variant="secondary" className="flex-1" onClick={onClose} type="button">Cancel</Button>
+                <Button className="flex-1" type="submit" disabled={loading}>
+                  {loading ? 'Updating...' : 'Update Password'}
+                </Button>
+              </div>
+            </form>
+          )}
+        </Card>
+      </motion.div>
+    </motion.div>
+  );
+};
+
 // --- Sub-components ---
 
-function NavButton({ active, onClick, icon: Icon, label }: any) {
+function BottomNav({ activeTab, onNavigate }: any) {
+  const tabs = [
+    { id: 'dashboard', icon: LayoutDashboard, label: 'Home' },
+    { id: 'timetable', icon: Calendar, label: 'Planner' },
+    { id: 'leaderboard', icon: Award, label: 'Rank' },
+    { id: 'settings', icon: Settings, label: 'Settings' },
+  ];
+
   return (
-    <button 
-      onClick={onClick}
-      className={`flex flex-col lg:flex-row items-center gap-1 lg:gap-3 px-2 sm:px-4 py-3 rounded-xl transition-all w-full ${active ? 'text-emerald-600 bg-emerald-50 lg:bg-emerald-50' : 'text-zinc-400 hover:text-zinc-600 hover:bg-zinc-50'}`}
-    >
-      <Icon size={20} />
-      <span className="text-[10px] lg:text-sm font-bold lg:font-medium uppercase lg:capitalize tracking-widest lg:tracking-normal">{label}</span>
-      {active && <motion.div layoutId="nav-active" className="hidden lg:block ml-auto w-1.5 h-1.5 rounded-full bg-emerald-600" />}
-    </button>
+    <div className="fixed bottom-0 left-0 right-0 h-20 bg-bg-card/80 backdrop-blur-xl border-t border-slate-800 flex items-center justify-around px-6 z-50">
+      {tabs.map(tab => (
+        <button 
+          key={tab.id}
+          onClick={() => onNavigate(tab.id)}
+          className={`flex flex-col items-center gap-1 transition-all ${activeTab === tab.id ? 'text-brand-primary' : 'text-text-secondary'}`}
+        >
+          <tab.icon size={24} className={activeTab === tab.id ? 'scale-110' : ''} />
+          <span className="text-[10px] font-bold uppercase tracking-widest">{tab.label}</span>
+        </button>
+      ))}
+    </div>
   );
 }
+
+const WelcomeScreen = ({ onLogin, onSignUp }: any) => (
+  <div className="min-h-screen flex flex-col items-center justify-center p-8 bg-bg-dark text-center">
+    <motion.div 
+      initial={{ scale: 0.8, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      className="mb-12"
+    >
+      <div className="w-32 h-32 bg-brand-primary rounded-[2.5rem] flex items-center justify-center shadow-2xl shadow-brand-primary/30 mx-auto mb-8">
+        <BookOpen size={64} className="text-white" />
+      </div>
+      <h1 className="text-5xl font-black tracking-tighter mb-4">Study Buddy</h1>
+      <p className="text-text-secondary font-bold uppercase tracking-[0.2em]">Plan • Study • Succeed</p>
+    </motion.div>
+    
+    <div className="w-full max-w-xs space-y-4">
+      <Button className="w-full py-5 text-lg" onClick={onSignUp}>Sign Up</Button>
+      <Button variant="secondary" className="w-full py-5 text-lg" onClick={onLogin}>Log In</Button>
+    </div>
+  </div>
+);
+
+const LoginScreen = ({ onBack, onLogin, isSignUp }: any) => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+
+  return (
+    <div className="min-h-screen flex flex-col p-8 bg-bg-dark">
+      <button onClick={onBack} className="mb-12 self-start p-2 hover:bg-white/5 rounded-xl transition-colors">
+        <ArrowLeft size={24} />
+      </button>
+      
+      <h2 className="text-4xl font-black tracking-tighter mb-2">{isSignUp ? 'Create Account' : 'Welcome Back!'}</h2>
+      <p className="text-text-secondary mb-12">Enter your details to continue</p>
+      
+      <div className="space-y-6">
+        <div className="space-y-2">
+          <label className="text-[10px] font-black text-text-secondary uppercase tracking-widest ml-4">Email</label>
+          <div className="relative">
+            <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary" size={20} />
+            <input 
+              type="email" 
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="alex@example.com"
+              className="w-full bg-bg-card border border-slate-800 rounded-2xl py-4 pl-12 pr-4 focus:outline-none focus:border-brand-primary transition-colors"
+            />
+          </div>
+        </div>
+        
+        <div className="space-y-2">
+          <label className="text-[10px] font-black text-text-secondary uppercase tracking-widest ml-4">Password</label>
+          <div className="relative">
+            <Clock className="absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary" size={20} />
+            <input 
+              type="password" 
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              className="w-full bg-bg-card border border-slate-800 rounded-2xl py-4 pl-12 pr-4 focus:outline-none focus:border-brand-primary transition-colors"
+            />
+          </div>
+        </div>
+        
+        <Button className="w-full py-5 text-lg mt-8" onClick={() => onLogin(email, password)}>
+          {isSignUp ? 'Sign Up' : 'Login'}
+        </Button>
+        
+        {!isSignUp && (
+          <button className="w-full text-center text-text-secondary text-sm font-bold hover:text-brand-primary transition-colors">
+            Forgot Password?
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
 
 function FriendCard({ name, status, online, onInvite }: any) {
   return (
@@ -2451,8 +3150,35 @@ function Onboarding({ profile, onComplete, user }: any) {
       subjects: data.subjects || [],
       studyStartTime: data.studyStartTime,
       studyEndTime: data.studyEndTime,
-      achievements: [],
+      achievements: [
+        { id: '1', title: '2 Quiz Study', description: 'Complete 2 quizzes', icon: 'Brain', completed: false, progress: 0, target: 2 },
+        { id: '2', title: '3 Year Trip', description: 'Study for 3 years', icon: 'Zap', completed: false, progress: 0, target: 3 },
+        { id: '3', title: 'Math Word', description: 'Master math terms', icon: 'BookOpen', completed: false, progress: 0, target: 10 }
+      ],
       createdAt: new Date().toISOString(),
+      points: 0,
+      rank: 1,
+      friends: [
+        { uid: 'f1', displayName: 'Emma', status: 'online', points: 1200 },
+        { uid: 'f2', displayName: 'Ryan', status: 'studying', points: 1800 },
+        { uid: 'f3', displayName: 'Liam', status: 'offline', points: 1150 },
+        { uid: 'f4', displayName: 'Sophia', status: 'online', points: 900 }
+      ],
+      groups: [],
+      dailyGoals: [
+        { id: 'g1', title: '2 Hours Study', completed: false },
+        { id: 'g2', title: '3 Quizzes', completed: false },
+        { id: 'g3', title: 'Review Notes', completed: false }
+      ],
+      notifications: [
+        { id: 'n1', title: 'New Quiz!', message: 'A new quiz is available for Math.', type: 'quiz', timestamp: new Date().toISOString(), read: false },
+        { id: 'n2', title: 'Emma challenged you!', message: 'Emma wants to battle in Physics.', type: 'challenge', timestamp: new Date().toISOString(), read: false }
+      ],
+      studyTips: [
+        { id: 't1', tip: 'Take regular breaks', completed: false },
+        { id: 't2', tip: 'Stay hydrated', completed: false },
+        { id: 't3', tip: 'Review notes weekly', completed: false }
+      ]
     };
 
     try {

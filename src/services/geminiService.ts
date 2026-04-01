@@ -23,54 +23,124 @@ export async function generateTimetable(profile: UserProfile): Promise<ScheduleB
     - Return a list of blocks with startTime, endTime, subject, and type (Study, Break, Rest).
   `;
 
-  const response = await ai.models.generateContent({
-    model: "gemini-3-flash-preview",
-    contents: prompt,
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.ARRAY,
-        items: {
-          type: Type.OBJECT,
-          properties: {
-            startTime: { type: Type.STRING },
-            endTime: { type: Type.STRING },
-            subject: { type: Type.STRING },
-            type: { type: Type.STRING, enum: ["Study", "Break", "Rest"] },
-            completed: { type: Type.BOOLEAN }
-          },
-          required: ["startTime", "endTime", "subject", "type"]
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              startTime: { type: Type.STRING },
+              endTime: { type: Type.STRING },
+              subject: { type: Type.STRING },
+              type: { type: Type.STRING, enum: ["Study", "Break", "Rest"] },
+              completed: { type: Type.BOOLEAN }
+            },
+            required: ["startTime", "endTime", "subject", "type"]
+          }
         }
       }
-    }
-  });
+    });
 
-  try {
     const blocks = JSON.parse(response.text);
     if (!Array.isArray(blocks)) return [];
     return blocks.map((b: any) => ({ ...b, completed: false }));
-  } catch (error) {
-    console.error("Failed to parse AI response:", error);
+  } catch (error: any) {
+    if (error.message?.includes("quota") || error.message?.includes("429")) {
+      throw new Error("Gemini API Quota Exceeded. Please try again in a few minutes.");
+    }
+    console.error("Failed to generate timetable:", error);
     return [];
   }
 }
 
-export async function getBuddyMessage(profile: UserProfile, mood: string, progressContext: string = ""): Promise<string> {
+export interface BuddyResponse {
+  message: string;
+  suggestions: string[];
+}
+
+export async function getBuddyMessage(profile: UserProfile, type: 'motivation' | 'progress' | 'tips', progressContext: string = ""): Promise<BuddyResponse> {
   const ai = getAI();
+  
+  let typeInstruction = "";
+  if (type === 'motivation') {
+    typeInstruction = "Give a short, motivational, and supportive message (max 2 sentences).";
+  } else if (type === 'progress') {
+    typeInstruction = "Ask a friendly question about their study progress or how they are finding a specific subject they are working on. Be encouraging.";
+  } else if (type === 'tips') {
+    typeInstruction = "Provide one specific, actionable study tip based on their strengths/weaknesses or general best practices for their education level. Keep it brief (max 2 sentences).";
+  }
+
   const prompt = `
     You are "Ace", an AI Study Buddy for a student named ${profile.displayName}.
-    The student is currently feeling: ${mood}.
-    Current progress: ${profile.targetExams.join(", ")} preparation.
-    ${progressContext}
-    Give a short, motivational, and supportive message (max 2 sentences).
+    Buddy Type: ${profile.buddyType} (if not AI, you are acting as their ${profile.buddyType} named ${profile.buddyName || 'Buddy'})
+    Education Level: ${profile.educationLevel}
+    Strengths: ${profile.strengths.join(", ")}
+    Weaknesses: ${profile.weaknesses.join(", ")}
+    Target Exams: ${profile.targetExams.join(", ")}
+    
+    Current context: ${progressContext}
+    
+    Task: ${typeInstruction}
+    
+    Return your response in JSON format:
+    {
+      "message": "your message here",
+      "suggestions": ["suggestion 1", "suggestion 2"]
+    }
+    Suggestions should be short (1-3 words) quick replies the student might want to say back.
   `;
 
-  const response = await ai.models.generateContent({
-    model: "gemini-3-flash-preview",
-    contents: prompt,
-  });
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+      }
+    });
 
-  return response.text || "Keep going! You're doing great.";
+    return JSON.parse(response.text || "{}") as BuddyResponse;
+  } catch (error: any) {
+    if (error.message?.includes("quota") || error.message?.includes("429")) {
+      throw new Error("Gemini API Quota Exceeded. Please try again in a few minutes.");
+    }
+    return {
+      message: "Keep going! You're doing great.",
+      suggestions: ["Thanks!", "I will!", "Tell me more"]
+    };
+  }
+}
+
+export function createBuddyChat(profile: UserProfile) {
+  const ai = getAI();
+  return ai.chats.create({
+    model: "gemini-3-flash-preview",
+    config: {
+      systemInstruction: `
+        You are acting as the student's study companion.
+        Student Name: ${profile.displayName}
+        Buddy Type: ${profile.buddyType}
+        Buddy Name: ${profile.buddyName || (profile.buddyType === 'AI' ? 'Ace' : 'Buddy')}
+        Education Level: ${profile.educationLevel}
+        Strengths: ${profile.strengths.join(", ")}
+        Weaknesses: ${profile.weaknesses.join(", ")}
+        Target Exams: ${profile.targetExams.join(", ")}
+        
+        Your goal is to be a supportive, motivational, and helpful study companion.
+        - If you are an AI buddy (Ace), be friendly and tech-savvy.
+        - If you are a Friend or App User, be peer-like and encouraging.
+        - If you are a Guardian, be supportive, firm but kind, and focused on their future.
+        - Ask about their progress.
+        - Offer personalized study tips.
+        - Keep responses concise but meaningful.
+      `,
+    },
+  });
 }
 
 export interface QuizQuestion {
@@ -84,36 +154,57 @@ export async function generateQuiz(subject: string, educationLevel: string, targ
   const examContext = targetExams.length > 0 ? ` specifically for ${targetExams.join(", ")}` : "";
   const prompt = `
     Generate a 20-question multiple-choice quiz for a ${educationLevel} student on the subject: ${subject}${examContext}.
-    Each question should have 4 options and a correct answer index (0-3).
-    Return a list of objects with question, options (array), and correctAnswer (number).
+    
+    IMPORTANT:
+    1. Each question MUST have 4 options and a correct answer index (0-3).
+    2. Provide a brief explanation for each correct answer.
+    3. Ensure the questions are accurate and relevant to the ${educationLevel} level.
+    4. Return ONLY a JSON array of objects.
+    
+    JSON Schema:
+    [
+      {
+        "question": "string",
+        "options": ["string", "string", "string", "string"],
+        "correctAnswer": number,
+        "explanation": "string"
+      }
+    ]
   `;
 
-  const response = await ai.models.generateContent({
-    model: "gemini-3-flash-preview",
-    contents: prompt,
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.ARRAY,
-        items: {
-          type: Type.OBJECT,
-          properties: {
-            question: { type: Type.STRING },
-            options: { type: Type.ARRAY, items: { type: Type.STRING } },
-            correctAnswer: { type: Type.INTEGER },
-            explanation: { type: Type.STRING, description: "A brief explanation of why the answer is correct." }
-          },
-          required: ["question", "options", "correctAnswer", "explanation"]
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              question: { type: Type.STRING },
+              options: { type: Type.ARRAY, items: { type: Type.STRING, minItems: 4, maxItems: 4 } },
+              correctAnswer: { type: Type.INTEGER, minimum: 0, maximum: 3 },
+              explanation: { type: Type.STRING, description: "A brief explanation of why the answer is correct." }
+            },
+            required: ["question", "options", "correctAnswer", "explanation"]
+          }
         }
       }
-    }
-  });
+    });
 
-  try {
     const quiz = JSON.parse(response.text);
-    return Array.isArray(quiz) ? quiz : [];
-  } catch (error) {
-    console.error("Failed to parse AI quiz response:", error);
-    return [];
+    if (!Array.isArray(quiz) || quiz.length === 0) {
+       throw new Error("Invalid quiz format received from AI");
+    }
+    return quiz;
+  } catch (error: any) {
+    if (error.message?.includes("quota") || error.message?.includes("429")) {
+      throw new Error("Gemini API Quota Exceeded. Please try again in a few minutes.");
+    }
+    console.error("Failed to generate quiz:", error);
+    // If it's a parse error or empty array, we want to let the component handle it
+    throw error;
   }
 }

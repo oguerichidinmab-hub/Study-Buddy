@@ -1,25 +1,66 @@
 @import "tailwindcss";
 
+@theme {
+  --color-brand-primary: #10B981;
+  --color-brand-secondary: #8B5CF6;
+  --color-brand-accent: #F43F5E;
+  --color-bg-dark: #0F172A;
+  --color-bg-card: #1E293B;
+  --color-text-primary: #F8FAFC;
+  --color-text-secondary: #94A3B8;
+}
+
 @layer base {
+  body {
+    @apply bg-bg-dark text-text-primary font-sans;
+  }
+  
   .high-contrast {
-    filter: contrast(1.5) saturate(1.2);
-  }
-  .high-contrast .bg-white {
-    background-color: #ffffff !important;
-    border-color: #000000 !important;
-  }
-  .high-contrast .text-zinc-500, 
-  .high-contrast .text-zinc-400 {
-    color: #000000 !important;
-    font-weight: 600;
+    filter: contrast(1.2) saturate(1.1);
   }
   
   .large-text {
-    font-size: 1.2rem;
+    font-size: 1.1rem;
   }
-  .large-text h1 { font-size: 3rem !important; }
-  .large-text h2 { font-size: 2.5rem !important; }
-  .large-text h3 { font-size: 2rem !important; }
-  .large-text p { font-size: 1.1rem !important; }
-  .large-text button { font-size: 1.1rem !important; }
+  
+  /* Custom scrollbar for dark theme */
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #0F172A;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #334155;
+    border-radius: 10px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #475569;
+  }
+}
+
+.glass {
+  background: rgba(30, 41, 59, 0.7);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.nav-item-active {
+  @apply text-brand-primary;
+}
+
+.nav-item-inactive {
+  @apply text-text-secondary;
+}
+
+.btn-primary {
+  @apply bg-brand-primary text-white font-bold py-3 px-6 rounded-2xl transition-all active:scale-95 shadow-lg shadow-brand-primary/20;
+}
+
+.btn-secondary {
+  @apply bg-bg-card text-text-primary border border-slate-700 font-bold py-3 px-6 rounded-2xl transition-all active:scale-95;
+}
+
+.card-dark {
+  @apply bg-bg-card border border-slate-800 rounded-[2rem] p-6 shadow-xl;
 }
