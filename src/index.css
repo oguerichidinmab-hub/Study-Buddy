@@ -4,10 +4,14 @@
   --color-brand-primary: #10B981;
   --color-brand-secondary: #8B5CF6;
   --color-brand-accent: #F43F5E;
-  --color-bg-dark: #0F172A;
-  --color-bg-card: #1E293B;
+  --color-brand-amber: #F59E0B;
+  --color-brand-blue: #3B82F6;
+  --color-bg-dark: #020617;
+  --color-bg-card: #0F172A;
+  --color-bg-card-light: #1E293B;
   --color-text-primary: #F8FAFC;
   --color-text-secondary: #94A3B8;
+  --color-text-muted: #64748B;
 }
 
 @layer base {

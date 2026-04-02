@@ -14,9 +14,10 @@ import {
 } from 'firebase/firestore';
 import { 
   BookOpen, Calendar, CheckCircle, Clock, LayoutDashboard, LogOut, 
-  MessageSquare, Play, Plus, Settings, User as UserIcon, Zap, 
+  MessageSquare, Play, Plus, Settings as SettingsIcon, User as UserIcon, Zap, 
   Award, Brain, Coffee, Moon, Sun, Target, TrendingUp, X, Lightbulb,
-  ChevronRight, ArrowLeft, RefreshCw, Sparkles, Volume2, Accessibility, Users, Info, Timer, AlertTriangle, ExternalLink
+  ChevronRight, ArrowLeft, RefreshCw, Sparkles, Volume2, Accessibility, Users, Info, Timer, AlertTriangle, ExternalLink,
+  Bell, Check, Lock
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { io, Socket } from "socket.io-client";
@@ -76,22 +77,582 @@ const Badge = ({ children, color = 'emerald' }: any) => {
   );
 };
 
+const NavButton = ({ active, onClick, icon: Icon, label }: any) => (
+  <button 
+    onClick={onClick}
+    className={`flex flex-col lg:flex-row items-center gap-2 p-4 rounded-2xl transition-all w-full ${active ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/20' : 'text-text-secondary hover:bg-white/5'}`}
+  >
+    <Icon size={24} />
+    <span className="text-[10px] lg:text-sm font-bold uppercase tracking-widest lg:normal-case lg:tracking-normal">{label}</span>
+  </button>
+);
+
+const Quiz = ({ subject, educationLevel, targetExams, cachedQuestions, onCacheQuestions, onComplete, onCancel }: any) => {
+  const [questions, setQuestions] = useState<any[]>(cachedQuestions || []);
+  const [currentIdx, setCurrentIdx] = useState(0);
+  const [score, setScore] = useState(0);
+  const [loading, setLoading] = useState(!cachedQuestions);
+  const [finished, setFinished] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(10 * 60); // 10 minutes in seconds
+
+  useEffect(() => {
+    if (!cachedQuestions) {
+      const fetchQuestions = async () => {
+        try {
+          const qs = await generateQuiz(subject, educationLevel, targetExams);
+          setQuestions(qs);
+          onCacheQuestions(qs);
+        } catch (err) {
+          console.error("Quiz generation failed:", err);
+        } finally {
+          setLoading(false);
+        }
+      };
+      fetchQuestions();
+    }
+  }, [subject, educationLevel, targetExams, cachedQuestions, onCacheQuestions]);
+
+  useEffect(() => {
+    if (loading || finished) return;
+
+    const interval = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          setFinished(true);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [loading, finished]);
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const handleAnswer = (isCorrect: boolean) => {
+    if (isCorrect) setScore(s => s + 1);
+    if (currentIdx < questions.length - 1) {
+      setCurrentIdx(i => i + 1);
+    } else {
+      setFinished(true);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="fixed inset-0 bg-bg-dark/80 backdrop-blur-sm z-[120] flex items-center justify-center">
+        <Card className="p-8 text-center space-y-4">
+          <RefreshCw className="animate-spin text-brand-primary mx-auto" size={48} />
+          <h3 className="text-xl font-bold">Generating Quiz...</h3>
+          <p className="text-text-secondary">Ace is crafting questions for {subject}</p>
+        </Card>
+      </div>
+    );
+  }
+
+  if (finished) {
+    return (
+      <div className="fixed inset-0 bg-bg-dark/80 backdrop-blur-sm z-[120] flex items-center justify-center p-6">
+        <Card className="max-w-md w-full p-8 text-center space-y-6">
+          <div className="w-20 h-20 bg-brand-primary/20 text-brand-primary rounded-full flex items-center justify-center mx-auto">
+            <Award size={48} />
+          </div>
+          <div>
+            <h3 className="text-2xl font-bold">Quiz Complete!</h3>
+            <p className="text-text-secondary">{timeLeft === 0 ? "Time's up! " : ""}You scored {score} out of {questions.length}</p>
+          </div>
+          <div className="flex gap-3">
+            <Button variant="secondary" className="flex-1" onClick={onCancel}>Close</Button>
+            <Button className="flex-1" onClick={() => onComplete(score, questions.length)}>Save Result</Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  const currentQ = questions[currentIdx];
+
+  return (
+    <div className="fixed inset-0 bg-bg-dark/80 backdrop-blur-sm z-[120] flex items-center justify-center p-6">
+      <Card className="max-w-2xl w-full p-8 space-y-8">
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <Badge color="violet">{subject}</Badge>
+            <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${timeLeft < 60 ? 'bg-rose-500/10 text-rose-400 border-rose-500/20 animate-pulse' : 'bg-slate-800 text-zinc-400 border-slate-700'}`}>
+              <Timer size={14} />
+              {formatTime(timeLeft)}
+            </div>
+          </div>
+          <span className="text-sm font-bold text-text-secondary">Question {currentIdx + 1} of {questions.length}</span>
+        </div>
+        <h3 className="text-xl font-bold leading-tight">{currentQ.question}</h3>
+        <div className="grid grid-cols-1 gap-3">
+          {currentQ.options.map((opt: string, idx: number) => (
+            <button 
+              key={idx}
+              onClick={() => handleAnswer(idx === currentQ.correctAnswer)}
+              className="p-4 rounded-2xl border border-slate-800 text-left hover:bg-white/5 transition-all font-medium"
+            >
+              {opt}
+            </button>
+          ))}
+        </div>
+        <Button variant="secondary" className="w-full" onClick={onCancel}>Cancel Quiz</Button>
+      </Card>
+    </div>
+  );
+};
+
+const Friends = ({ user }: any) => {
+  const friends = [
+    { name: 'Emma', status: 'online', avatar: 'https://picsum.photos/seed/emma/100/100' },
+    { name: 'Ryan', status: 'online', avatar: 'https://picsum.photos/seed/ryan/100/100' },
+    { name: 'Liam', status: 'away', avatar: 'https://picsum.photos/seed/liam/100/100' },
+    { name: 'Sophia', status: 'offline', avatar: 'https://picsum.photos/seed/sophia/100/100' },
+  ];
+
+  return (
+    <div className="flex-1 overflow-y-auto pb-32 p-6">
+      <div className="flex justify-between items-center mb-8">
+        <h2 className="text-3xl font-black">Friends</h2>
+        <button className="w-10 h-10 bg-bg-card border border-slate-800 rounded-xl flex items-center justify-center">
+          <Users size={20} />
+        </button>
+      </div>
+      <div className="space-y-4">
+        {friends.map((friend, i) => (
+          <Card key={i} className="flex items-center gap-4 p-4">
+            <div className="relative">
+              <img src={friend.avatar} alt={friend.name} className="w-12 h-12 rounded-2xl object-cover" referrerPolicy="no-referrer" />
+              <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-bg-card ${
+                friend.status === 'online' ? 'bg-emerald-500' : 
+                friend.status === 'away' ? 'bg-amber-500' : 'bg-slate-500'
+              }`} />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-bold">{friend.name}</h3>
+              <p className="text-xs text-text-secondary capitalize">{friend.status}</p>
+            </div>
+            <button className="p-2 text-text-secondary hover:text-brand-primary transition-colors">
+              <MessageSquare size={20} />
+            </button>
+          </Card>
+        ))}
+      </div>
+      <Button className="w-full mt-8" icon={Plus}>Add New Friend</Button>
+    </div>
+  );
+};
+
+const StudyGroups = ({ onAction }: any) => {
+  const groups = [
+    { name: 'Physics Group', members: 12, icon: '⚛️', color: 'blue' },
+    { name: 'Exam Prep', members: 45, icon: '📝', color: 'violet' },
+    { name: 'Math Squad', members: 8, icon: '📐', color: 'emerald' },
+  ];
+
+  return (
+    <div className="flex-1 overflow-y-auto pb-32 p-6">
+      <div className="flex justify-between items-center mb-8">
+        <h2 className="text-3xl font-black">Study Groups</h2>
+        <button onClick={() => onAction('back')} className="w-10 h-10 bg-bg-card border border-slate-800 rounded-xl flex items-center justify-center">
+          <X size={20} />
+        </button>
+      </div>
+      <div className="space-y-4">
+        {groups.map((group, i) => (
+          <Card key={i} className="p-5 flex items-center gap-4">
+            <div className={`w-12 h-12 rounded-2xl bg-brand-${group.color}/20 flex items-center justify-center text-2xl`}>
+              {group.icon}
+            </div>
+            <div className="flex-1">
+              <h3 className="font-bold">{group.name}</h3>
+              <p className="text-xs text-text-secondary">{group.members} Members</p>
+            </div>
+            <Button variant="secondary" className="px-4 py-2 text-xs">Join</Button>
+          </Card>
+        ))}
+      </div>
+      <Button className="w-full mt-8" icon={Plus}>Create Group</Button>
+    </div>
+  );
+};
+
+const QuizBattle = ({ onAction }: any) => {
+  return (
+    <div className="flex-1 overflow-y-auto pb-32 p-6">
+      <div className="flex items-center gap-4 mb-8">
+        <button onClick={() => onAction('back')} className="p-2 hover:bg-white/5 rounded-xl">
+          <ArrowLeft size={24} />
+        </button>
+        <h2 className="text-2xl font-black">Quiz Battle</h2>
+      </div>
+      
+      <Card className="p-8 text-center space-y-8">
+        <div className="flex justify-center items-center gap-8">
+          <div className="space-y-3">
+            <img src="https://picsum.photos/seed/you/100/100" className="w-20 h-20 rounded-3xl border-4 border-brand-primary mx-auto" referrerPolicy="no-referrer" />
+            <p className="font-bold">You</p>
+            <Badge color="emerald">Online</Badge>
+          </div>
+          <div className="text-4xl font-black text-text-secondary italic">VS</div>
+          <div className="space-y-3">
+            <img src="https://picsum.photos/seed/emma/100/100" className="w-20 h-20 rounded-3xl border-4 border-brand-accent mx-auto" referrerPolicy="no-referrer" />
+            <p className="font-bold">Emma</p>
+            <Badge color="rose">Online</Badge>
+          </div>
+        </div>
+        
+        <div className="text-6xl font-black tracking-tighter">12 - 9</div>
+        
+        <Button className="w-full py-5 text-lg" icon={Zap}>Join Battle</Button>
+      </Card>
+    </div>
+  );
+};
+
+const Progress = ({ user }: any) => {
+  const stats = [
+    { label: 'Tasks', value: 85, color: 'emerald' },
+    { label: 'Bliss', value: 65, color: 'amber' },
+  ];
+
+  return (
+    <div className="flex-1 overflow-y-auto pb-32 p-6">
+      <div className="flex justify-between items-center mb-8">
+        <h2 className="text-3xl font-black">Progress</h2>
+        <div className="flex gap-2">
+          <button className="p-2 bg-bg-card border border-slate-800 rounded-xl"><ChevronRight size={20} className="rotate-180" /></button>
+          <button className="p-2 bg-bg-card border border-slate-800 rounded-xl"><ChevronRight size={20} /></button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 mb-8">
+        {stats.map((stat, i) => (
+          <Card key={i} className="p-6 space-y-4">
+            <div className="flex justify-between items-center">
+              <span className="text-xs font-bold text-text-secondary uppercase tracking-widest">{stat.label}</span>
+              <span className={`text-xs font-bold text-brand-${stat.color}`}>{stat.value}%</span>
+            </div>
+            <div className="h-32 flex items-end gap-1">
+              {[40, 70, 45, 90, 65, 85].map((h, j) => (
+                <div key={j} className={`flex-1 bg-brand-${stat.color}${j === 5 ? '' : '/20'} rounded-t-lg`} style={{ height: `${h}%` }} />
+              ))}
+            </div>
+          </Card>
+        ))}
+      </div>
+
+      <Card className="p-6">
+        <h3 className="font-bold mb-6">Study Hours</h3>
+        <div className="flex items-center gap-6">
+          <div className="relative w-32 h-32">
+            <svg className="w-full h-full" viewBox="0 0 36 36">
+              <path className="text-slate-800" strokeDasharray="100, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3" />
+              <path className="text-brand-primary" strokeDasharray="70, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3" />
+              <path className="text-brand-secondary" strokeDasharray="30, 100" strokeDashoffset="-70" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3" />
+            </svg>
+            <div className="absolute inset-0 flex items-center justify-center flex-col">
+              <span className="text-xl font-black">12h</span>
+              <span className="text-[8px] text-text-secondary uppercase font-bold">Total</span>
+            </div>
+          </div>
+          <div className="flex-1 space-y-3">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-brand-primary" />
+              <span className="text-xs font-bold">Deep Work</span>
+              <span className="text-xs text-text-secondary ml-auto">8h</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-brand-secondary" />
+              <span className="text-xs font-bold">Quizzes</span>
+              <span className="text-xs text-text-secondary ml-auto">3h</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-slate-700" />
+              <span className="text-xs font-bold">Planning</span>
+              <span className="text-xs text-text-secondary ml-auto">1h</span>
+            </div>
+          </div>
+        </div>
+      </Card>
+    </div>
+  );
+};
+
+const DailyGoals = ({ onAction }: any) => {
+  const goals = [
+    { text: '2 Hours Study', completed: true },
+    { text: '3 Quizzes', completed: true },
+    { text: 'Review Notes', completed: false },
+  ];
+
+  return (
+    <div className="flex-1 overflow-y-auto pb-32 p-6">
+      <div className="flex items-center gap-4 mb-8">
+        <button onClick={() => onAction('back')} className="p-2 hover:bg-white/5 rounded-xl">
+          <ArrowLeft size={24} />
+        </button>
+        <h2 className="text-2xl font-black">Daily Goals</h2>
+      </div>
+      
+      <div className="space-y-4">
+        {goals.map((goal, i) => (
+          <Card key={i} className="flex items-center gap-4 p-5">
+            <div className={`w-8 h-8 rounded-xl flex items-center justify-center border-2 ${goal.completed ? 'bg-brand-primary border-brand-primary text-white' : 'border-slate-800 text-transparent'}`}>
+              <Check size={18} />
+            </div>
+            <span className={`font-bold ${goal.completed ? 'text-text-primary' : 'text-text-secondary'}`}>{goal.text}</span>
+          </Card>
+        ))}
+      </div>
+      
+      <Button className="w-full mt-8" onClick={() => onAction('back')}>Save</Button>
+    </div>
+  );
+};
+
+const Notifications = ({ onAction }: any) => {
+  const notifications = [
+    { title: 'New Quiz!', desc: 'Math quiz is ready for you', time: '2m ago', icon: Zap, color: 'amber' },
+    { title: 'Emma challenged you!', desc: 'Quiz battle in Physics', time: '1h ago', icon: Users, color: 'rose' },
+    { title: 'Math Result', desc: 'You scored 85% in Algebra', time: '3h ago', icon: Award, color: 'emerald' },
+  ];
+
+  return (
+    <div className="flex-1 overflow-y-auto pb-32 p-6">
+      <div className="flex items-center gap-4 mb-8">
+        <button onClick={() => onAction('back')} className="p-2 hover:bg-white/5 rounded-xl">
+          <ArrowLeft size={24} />
+        </button>
+        <h2 className="text-2xl font-black">Notifications</h2>
+      </div>
+      
+      <div className="space-y-4">
+        {notifications.map((n, i) => (
+          <Card key={i} className="p-5 flex items-center gap-4">
+            <div className={`w-12 h-12 rounded-2xl bg-brand-${n.color}/20 text-brand-${n.color} flex items-center justify-center`}>
+              <n.icon size={24} />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-bold">{n.title}</h3>
+              <p className="text-xs text-text-secondary">{n.desc}</p>
+            </div>
+            <span className="text-[10px] font-bold text-text-muted">{n.time}</span>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const Achievements = ({ onAction }: any) => {
+  const achievements = [
+    { title: '2 Quiz Study', progress: 100, icon: '🏆', color: 'amber' },
+    { title: '3 Day Streak', progress: 60, icon: '🔥', color: 'rose' },
+    { title: 'Math Master', progress: 30, icon: '📐', color: 'emerald' },
+  ];
+
+  return (
+    <div className="flex-1 overflow-y-auto pb-32 p-6">
+      <div className="flex items-center gap-4 mb-8">
+        <button onClick={() => onAction('back')} className="p-2 hover:bg-white/5 rounded-xl">
+          <ArrowLeft size={24} />
+        </button>
+        <h2 className="text-2xl font-black">Achievements</h2>
+      </div>
+      
+      <div className="space-y-4">
+        {achievements.map((a, i) => (
+          <Card key={i} className="p-5 flex items-center gap-4">
+            <div className={`w-12 h-12 rounded-2xl bg-brand-${a.color}/20 flex items-center justify-center text-2xl`}>
+              {a.icon}
+            </div>
+            <div className="flex-1">
+              <h3 className="font-bold">{a.title}</h3>
+              <div className="h-2 bg-slate-800 rounded-full mt-2 overflow-hidden">
+                <div className={`h-full bg-brand-${a.color}`} style={{ width: `${a.progress}%` }} />
+              </div>
+            </div>
+            <span className="text-xs font-bold text-text-secondary">{a.progress}%</span>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const StudyTips = ({ onAction }: any) => {
+  const tips = [
+    { title: 'Pomodoro Technique', desc: 'Study for 25 mins, break for 5', completed: true },
+    { title: 'Active Recall', desc: 'Test yourself frequently', completed: false },
+    { title: 'Spaced Repetition', desc: 'Review at increasing intervals', completed: false },
+  ];
+
+  return (
+    <div className="flex-1 overflow-y-auto pb-32 p-6">
+      <div className="flex items-center gap-4 mb-8">
+        <button onClick={() => onAction('back')} className="p-2 hover:bg-white/5 rounded-xl">
+          <ArrowLeft size={24} />
+        </button>
+        <h2 className="text-2xl font-black">Study Tips</h2>
+      </div>
+      
+      <div className="space-y-4">
+        {tips.map((tip, i) => (
+          <Card key={i} className="p-5 flex items-center gap-4">
+            <div className={`w-8 h-8 rounded-xl flex items-center justify-center border-2 ${tip.completed ? 'bg-brand-primary border-brand-primary text-white' : 'border-slate-800 text-transparent'}`}>
+              <Check size={18} />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-bold">{tip.title}</h3>
+              <p className="text-xs text-text-secondary">{tip.desc}</p>
+            </div>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const StudyChat = ({ onAction }: any) => {
+  const chats = [
+    { name: 'Physics Group', lastMsg: 'See you at 5!', time: '2m', avatar: 'https://picsum.photos/seed/phys/100/100' },
+    { name: 'Emma', lastMsg: 'Ready for the quiz?', time: '1h', avatar: 'https://picsum.photos/seed/emma/100/100' },
+    { name: 'Ryan', lastMsg: 'Thanks for the help!', time: '3h', avatar: 'https://picsum.photos/seed/ryan/100/100' },
+  ];
+
+  return (
+    <div className="flex-1 overflow-y-auto pb-32 p-6">
+      <div className="flex items-center gap-4 mb-8">
+        <button onClick={() => onAction('back')} className="p-2 hover:bg-white/5 rounded-xl">
+          <ArrowLeft size={24} />
+        </button>
+        <h2 className="text-2xl font-black">Study Chat</h2>
+      </div>
+      
+      <div className="space-y-4">
+        {chats.map((chat, i) => (
+          <Card key={i} className="p-4 flex items-center gap-4">
+            <img src={chat.avatar} alt={chat.name} className="w-12 h-12 rounded-2xl object-cover" referrerPolicy="no-referrer" />
+            <div className="flex-1">
+              <h3 className="font-bold">{chat.name}</h3>
+              <p className="text-xs text-text-secondary truncate">{chat.lastMsg}</p>
+            </div>
+            <span className="text-[10px] font-bold text-text-muted">{chat.time}</span>
+          </Card>
+        ))}
+      </div>
+      <Button className="w-full mt-8" icon={Plus}>New Message</Button>
+    </div>
+  );
+};
+
+const PastQuestions = ({ onAction }: any) => {
+  const subjects = [
+    { name: 'Math', color: 'emerald' },
+    { name: 'Science', color: 'blue' },
+    { name: 'History', color: 'rose' },
+    { name: 'English', color: 'violet' },
+  ];
+
+  return (
+    <div className="flex-1 overflow-y-auto pb-32 p-6">
+      <div className="flex items-center gap-4 mb-8">
+        <button onClick={() => onAction('back')} className="p-2 hover:bg-white/5 rounded-xl">
+          <ArrowLeft size={24} />
+        </button>
+        <h2 className="text-2xl font-black">Past Questions</h2>
+      </div>
+      
+      <div className="space-y-3">
+        {subjects.map((s, i) => (
+          <Card key={i} className="p-4 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className={`w-10 h-10 rounded-xl bg-brand-${s.color}/20 text-brand-${s.color} flex items-center justify-center`}>
+                <BookOpen size={20} />
+              </div>
+              <span className="font-bold">{s.name}</span>
+            </div>
+            <ChevronRight size={20} className="text-text-muted" />
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 const Dashboard = ({ user, onAction }: any) => {
+  const tasks = [
+    { name: 'Math', icon: Brain, color: 'amber', progress: 3 },
+    { name: 'History', icon: BookOpen, color: 'emerald', progress: 2 },
+    { name: 'Free Time', icon: Coffee, color: 'rose', progress: 1 },
+  ];
+
   return (
     <div className="flex-1 overflow-y-auto pb-32">
       <div className="p-6 space-y-8">
         {/* Header */}
         <div className="flex justify-between items-center">
-          <div>
-            <h2 className="text-3xl font-black">Hi, {user?.displayName?.split(' ')[0]}!</h2>
-            <p className="text-text-secondary font-bold">Ready for today's session?</p>
+          <div className="flex items-center gap-3">
+            <img src="https://picsum.photos/seed/user/100/100" className="w-12 h-12 rounded-2xl object-cover border-2 border-brand-primary" referrerPolicy="no-referrer" />
+            <div>
+              <h2 className="text-2xl font-black">Hi, {user?.displayName?.split(' ')[0] || 'Alex'}!</h2>
+              <p className="text-text-secondary text-xs font-bold uppercase tracking-widest">Ready for today?</p>
+            </div>
           </div>
           <button onClick={() => onAction('notifications')} className="w-12 h-12 bg-bg-card border border-slate-800 rounded-2xl flex items-center justify-center relative">
             <Bell size={24} />
-            {user?.notifications?.some((n: any) => !n.read) && (
-              <span className="absolute top-3 right-3 w-3 h-3 bg-brand-accent rounded-full border-2 border-bg-dark" />
-            )}
+            <span className="absolute top-3 right-3 w-3 h-3 bg-brand-accent rounded-full border-2 border-bg-dark" />
           </button>
+        </div>
+
+        {/* Today's Tasks */}
+        <section className="space-y-4">
+          <h3 className="text-sm font-black text-text-secondary uppercase tracking-[0.2em]">Today's Tasks</h3>
+          <div className="space-y-3">
+            {tasks.map((task, i) => (
+              <Card key={i} className="p-4 flex items-center gap-4">
+                <div className={`w-10 h-10 rounded-xl bg-brand-${task.color}/20 text-brand-${task.color} flex items-center justify-center`}>
+                  <task.icon size={20} />
+                </div>
+                <div className="flex-1">
+                  <h4 className="font-bold">{task.name}</h4>
+                </div>
+                <div className="flex gap-1">
+                  {[1, 2, 3].map(dot => (
+                    <div key={dot} className={`w-2 h-2 rounded-full ${dot <= task.progress ? `bg-brand-${task.color}` : 'bg-slate-800'}`} />
+                  ))}
+                </div>
+              </Card>
+            ))}
+          </div>
+        </section>
+
+        {/* Quick Actions Grid */}
+        <div className="grid grid-cols-3 gap-4">
+          {[
+            { icon: Users, label: 'Friends', action: 'friends', color: 'emerald' },
+            { icon: MessageSquare, label: 'Chat', action: 'chat', color: 'blue' },
+            { icon: Award, label: 'Awards', action: 'achievements', color: 'amber' },
+          ].map((item, i) => (
+            <button 
+              key={i} 
+              onClick={() => onAction(item.action)}
+              className="flex flex-col items-center gap-2 p-4 bg-bg-card border border-slate-800 rounded-2xl active:scale-95 transition-all"
+            >
+              <div className={`w-10 h-10 rounded-xl bg-brand-${item.color}/20 text-brand-${item.color} flex items-center justify-center`}>
+                <item.icon size={20} />
+              </div>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-text-secondary">{item.label}</span>
+            </button>
+          ))}
         </div>
 
         {/* Buddy Card */}
@@ -112,98 +673,71 @@ const Dashboard = ({ user, onAction }: any) => {
             <Brain size={160} />
           </div>
         </Card>
-
-        {/* Quick Actions */}
-        <div className="grid grid-cols-2 gap-4">
-          <Card onClick={() => onAction('focus')} className="p-6 flex flex-col items-center text-center gap-3">
-            <div className="w-12 h-12 bg-brand-accent/20 text-brand-accent rounded-2xl flex items-center justify-center">
-              <Timer size={24} />
-            </div>
-            <span className="font-black">Focus Mode</span>
-          </Card>
-          <Card onClick={() => onAction('quiz')} className="p-6 flex flex-col items-center text-center gap-3">
-            <div className="w-12 h-12 bg-brand-primary/20 text-brand-primary rounded-2xl flex items-center justify-center">
-              <Zap size={24} />
-            </div>
-            <span className="font-black">Quick Quiz</span>
-          </Card>
-        </div>
-
-        {/* Daily Goals */}
-        <div className="space-y-4">
-          <div className="flex justify-between items-center">
-            <h3 className="text-xl font-black">Daily Goals</h3>
-            <button onClick={() => onAction('goals')} className="text-brand-primary font-bold text-sm">View All</button>
-          </div>
-          <div className="space-y-3">
-            {user?.dailyGoals?.slice(0, 2).map((goal: any) => (
-              <Card key={goal.id} className="p-4 flex items-center gap-4">
-                <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center ${goal.completed ? 'bg-brand-primary border-brand-primary text-white' : 'border-slate-700'}`}>
-                  {goal.completed && <Check size={14} />}
-                </div>
-                <span className={`font-bold flex-1 ${goal.completed ? 'text-text-secondary line-through' : ''}`}>{goal.title}</span>
-              </Card>
-            ))}
-          </div>
-        </div>
-
-        {/* Study Groups */}
-        <div className="space-y-4">
-          <div className="flex justify-between items-center">
-            <h3 className="text-xl font-black">Study Groups</h3>
-            <button onClick={() => onAction('groups')} className="text-brand-primary font-bold text-sm">Join New</button>
-          </div>
-          <div className="flex gap-4 overflow-x-auto pb-2 no-scrollbar">
-            {user?.groups?.map((group: any) => (
-              <Card key={group.id} className="min-w-[200px] p-4 space-y-3">
-                <div className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center">
-                  <Users size={20} />
-                </div>
-                <h4 className="font-black">{group.name}</h4>
-                <p className="text-xs text-text-secondary font-bold">{group.members} Members</p>
-              </Card>
-            ))}
-          </div>
-        </div>
       </div>
     </div>
   );
 };
 
-const Timetable = ({ user }: any) => {
+const Timetable = ({ onAction }: any) => {
+  const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+  const grid = [
+    [1, 2, 3, 3, 4],
+    [1, 2, 5, 3, 4],
+    [6, 7, 8, 9, 5],
+    [6, 10, 8, 11, 12],
+    [13, 0, 0, 0, 14],
+  ];
+
+  const colors = [
+    'bg-slate-800', // 0: Empty
+    'bg-rose-500', 
+    'bg-violet-500',
+    'bg-emerald-500',
+    'bg-blue-500',
+    'bg-amber-500',
+    'bg-brand-primary',
+    'bg-brand-secondary',
+    'bg-brand-accent',
+    'bg-brand-amber',
+    'bg-brand-blue',
+    'bg-rose-600',
+    'bg-violet-600',
+    'bg-emerald-600',
+    'bg-blue-600',
+  ];
+
   return (
-    <div className="flex-1 overflow-y-auto pb-32 p-6 space-y-8">
-      <div className="flex justify-between items-center">
-        <h2 className="text-3xl font-black">Timetable</h2>
-        <button className="w-12 h-12 bg-bg-card border border-slate-800 rounded-2xl flex items-center justify-center">
-          <Plus size={24} />
+    <div className="flex-1 overflow-y-auto pb-32 p-6">
+      <div className="flex justify-between items-center mb-8">
+        <div className="flex items-center gap-2">
+          <button onClick={() => onAction('back')} className="p-2 hover:bg-white/5 rounded-xl"><ArrowLeft size={20} /></button>
+          <h2 className="text-2xl font-black">Toodly Planner</h2>
+          <button className="p-2 hover:bg-white/5 rounded-xl"><ChevronRight size={20} /></button>
+        </div>
+        <button className="w-10 h-10 bg-bg-card border border-slate-800 rounded-xl flex items-center justify-center">
+          <SettingsIcon size={20} />
         </button>
       </div>
 
-      <div className="flex gap-4 overflow-x-auto pb-2 no-scrollbar">
-        {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, i) => (
-          <button key={day} className={`min-w-[60px] py-4 rounded-2xl flex flex-col items-center gap-1 border-2 transition-all ${i === 0 ? 'bg-brand-primary border-brand-primary text-white' : 'bg-bg-card border-slate-800 text-text-secondary'}`}>
-            <span className="text-[10px] font-black uppercase tracking-widest">{day}</span>
-            <span className="text-lg font-black">{12 + i}</span>
-          </button>
+      <div className="grid grid-cols-5 gap-2 mb-4">
+        {days.map(day => (
+          <div key={day} className="text-center text-[10px] font-bold text-text-muted uppercase tracking-widest">{day}</div>
         ))}
       </div>
 
-      <div className="space-y-4">
-        {[
-          { time: '09:00 AM', subject: 'Mathematics', type: 'Quiz Practice', color: 'brand-primary' },
-          { time: '11:30 AM', subject: 'Physics', type: 'Formula Review', color: 'brand-accent' },
-          { time: '02:00 PM', subject: 'Biology', type: 'Group Study', color: 'brand-pink' },
-        ].map((session, i) => (
-          <div key={i} className="flex gap-4">
-            <div className="w-20 pt-2">
-              <span className="text-xs font-black text-text-secondary">{session.time}</span>
-            </div>
-            <Card className="flex-1 p-5 border-l-8" style={{ borderLeftColor: `var(--color-${session.color})` }}>
-              <h4 className="font-black text-lg">{session.subject}</h4>
-              <p className="text-sm text-text-secondary font-bold">{session.type}</p>
-            </Card>
+      <div className="grid grid-cols-5 gap-2 aspect-square">
+        {grid.flat().map((cell, i) => (
+          <div key={i} className={`rounded-xl ${colors[cell]} flex items-center justify-center text-[10px] font-bold text-white/50`}>
+            {cell > 0 ? cell : ''}
           </div>
+        ))}
+      </div>
+
+      <div className="mt-8 grid grid-cols-4 gap-4">
+        {[Plus, Calendar, UserIcon, Bell].map((Icon, i) => (
+          <button key={i} className="flex flex-col items-center gap-2 p-4 bg-bg-card border border-slate-800 rounded-2xl">
+            <Icon size={20} className="text-text-secondary" />
+          </button>
         ))}
       </div>
     </div>
@@ -292,7 +826,7 @@ const Settings = ({ user, onAction, onLogout }: any) => {
           <h4 className="text-[10px] font-black uppercase tracking-widest text-text-secondary ml-1">Account</h4>
           <Card onClick={() => onAction('editProfile')} className="p-4 flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <User size={20} className="text-brand-primary" />
+              <UserIcon size={20} className="text-brand-primary" />
               <span className="font-bold">Edit Profile</span>
             </div>
             <ChevronRight size={20} className="text-text-secondary" />
@@ -344,6 +878,7 @@ const EditBuddyModal = ({ profile, onSave, onCancel }: any) => {
     buddyAlwaysPicksCalls: profile.buddyAlwaysPicksCalls ?? true,
     buddyCaresAboutStudies: profile.buddyCaresAboutStudies ?? true,
   });
+  const [isCustomName, setIsCustomName] = useState(profile.buddyType === 'AI' && profile.buddyName !== 'Ace' && !!profile.buddyName);
 
   return (
     <div className="fixed inset-0 bg-zinc-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
@@ -365,7 +900,13 @@ const EditBuddyModal = ({ profile, onSave, onCancel }: any) => {
               ].map(type => (
                 <button 
                   key={type.id}
-                  onClick={() => setData({ ...data, buddyType: type.id as any })}
+                  onClick={() => {
+                    const newData = { ...data, buddyType: type.id as any };
+                    if (type.id === 'AI' && !isCustomName) {
+                      newData.buddyName = 'Ace';
+                    }
+                    setData(newData);
+                  }}
                   className={`p-2 rounded-xl border flex flex-col items-center gap-1 transition-all ${data.buddyType === type.id ? 'border-emerald-600 bg-emerald-50 text-emerald-700 font-bold' : 'border-zinc-100 bg-white'}`}
                 >
                   <type.icon size={16} />
@@ -375,62 +916,93 @@ const EditBuddyModal = ({ profile, onSave, onCancel }: any) => {
             </div>
           </div>
 
+          <div>
+            <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-2">Buddy Name</label>
+            {data.buddyType === 'AI' ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-zinc-600">Customize AI Name?</span>
+                  <button 
+                    onClick={() => {
+                      const isCustom = !isCustomName;
+                      setIsCustomName(isCustom);
+                      if (!isCustom) setData({ ...data, buddyName: 'Ace' });
+                    }}
+                    className={`w-10 h-5 rounded-full relative transition-colors ${isCustomName ? 'bg-emerald-600' : 'bg-zinc-200'}`}
+                  >
+                    <div className={`absolute top-1 w-3 h-3 bg-white rounded-full shadow-sm transition-all ${isCustomName ? 'right-1' : 'left-1'}`} />
+                  </button>
+                </div>
+                {isCustomName && (
+                  <input 
+                    type="text" 
+                    value={data.buddyName}
+                    onChange={(e) => setData({ ...data, buddyName: e.target.value })}
+                    className="w-full p-3 rounded-xl border border-zinc-100 text-sm focus:outline-none focus:border-emerald-600"
+                    placeholder="Enter custom AI name..."
+                  />
+                )}
+                {!isCustomName && (
+                  <div className="p-3 bg-zinc-50 rounded-xl border border-zinc-100 text-sm text-zinc-500">
+                    Ace (Default)
+                  </div>
+                )}
+              </div>
+            ) : (
+              <input 
+                type="text" 
+                value={data.buddyName}
+                onChange={(e) => setData({ ...data, buddyName: e.target.value })}
+                className="w-full p-3 rounded-xl border border-zinc-100 text-sm focus:outline-none focus:border-emerald-600"
+                placeholder="Enter buddy name..."
+              />
+            )}
+          </div>
+
           {data.buddyType !== 'AI' && (
-            <>
+            <div className="space-y-4">
               <div>
-                <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-2">Buddy Name</label>
-                <input 
-                  type="text" 
-                  value={data.buddyName}
-                  onChange={(e) => setData({ ...data, buddyName: e.target.value })}
-                  className="w-full p-3 rounded-xl border border-zinc-100 text-sm"
-                />
-              </div>
-              
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-2">Listening Rate (1-5)</label>
-                  <div className="flex justify-between">
-                    {[1, 2, 3, 4, 5].map(num => (
-                      <button 
-                        key={num}
-                        onClick={() => setData({ ...data, buddyRating: num })}
-                        className={`w-8 h-8 rounded-full flex items-center justify-center text-xs border ${data.buddyRating === num ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-zinc-400 border-zinc-100'}`}
-                      >
-                        {num}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-zinc-600">Always pick calls?</span>
-                  <div className="flex gap-2">
-                    <button onClick={() => setData({ ...data, buddyAlwaysPicksCalls: true })} className={`px-3 py-1 rounded-lg text-[10px] border ${data.buddyAlwaysPicksCalls ? 'bg-emerald-600 text-white' : 'bg-white text-zinc-400'}`}>Yes</button>
-                    <button onClick={() => setData({ ...data, buddyAlwaysPicksCalls: false })} className={`px-3 py-1 rounded-lg text-[10px] border ${!data.buddyAlwaysPicksCalls ? 'bg-emerald-600 text-white' : 'bg-white text-zinc-400'}`}>No</button>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-zinc-600">Cares about studies?</span>
-                  <div className="flex gap-2">
-                    <button onClick={() => setData({ ...data, buddyCaresAboutStudies: true })} className={`px-3 py-1 rounded-lg text-[10px] border ${data.buddyCaresAboutStudies ? 'bg-emerald-600 text-white' : 'bg-white text-zinc-400'}`}>Yes</button>
-                    <button onClick={() => setData({ ...data, buddyCaresAboutStudies: false })} className={`px-3 py-1 rounded-lg text-[10px] border ${!data.buddyCaresAboutStudies ? 'bg-emerald-600 text-white' : 'bg-white text-zinc-400'}`}>No</button>
-                  </div>
+                <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-2">Listening Rate (1-5)</label>
+                <div className="flex justify-between">
+                  {[1, 2, 3, 4, 5].map(num => (
+                    <button 
+                      key={num}
+                      onClick={() => setData({ ...data, buddyRating: num })}
+                      className={`w-8 h-8 rounded-full flex items-center justify-center text-xs border ${data.buddyRating === num ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-zinc-400 border-zinc-100'}`}
+                    >
+                      {num}
+                    </button>
+                  ))}
                 </div>
               </div>
-            </>
+
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-zinc-600">Always pick calls?</span>
+                <div className="flex gap-2">
+                  <button onClick={() => setData({ ...data, buddyAlwaysPicksCalls: true })} className={`px-3 py-1 rounded-lg text-[10px] border ${data.buddyAlwaysPicksCalls ? 'bg-emerald-600 text-white' : 'bg-white text-zinc-400'}`}>Yes</button>
+                  <button onClick={() => setData({ ...data, buddyAlwaysPicksCalls: false })} className={`px-3 py-1 rounded-lg text-[10px] border ${!data.buddyAlwaysPicksCalls ? 'bg-emerald-600 text-white' : 'bg-white text-zinc-400'}`}>No</button>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-zinc-600">Cares about studies?</span>
+                <div className="flex gap-2">
+                  <button onClick={() => setData({ ...data, buddyCaresAboutStudies: true })} className={`px-3 py-1 rounded-lg text-[10px] border ${data.buddyCaresAboutStudies ? 'bg-emerald-600 text-white' : 'bg-white text-zinc-400'}`}>Yes</button>
+                  <button onClick={() => setData({ ...data, buddyCaresAboutStudies: false })} className={`px-3 py-1 rounded-lg text-[10px] border ${!data.buddyCaresAboutStudies ? 'bg-emerald-600 text-white' : 'bg-white text-zinc-400'}`}>No</button>
+                </div>
+              </div>
+            </div>
           )}
         </div>
 
-          <div className="mt-8 flex gap-3">
-            <Button variant="secondary" className="flex-1" onClick={onCancel}>Cancel</Button>
-            <Button className="flex-1" onClick={() => onSave(data)}>Save Changes</Button>
-          </div>
-        </motion.div>
-      </div>
-    );
-  };
+        <div className="mt-8 flex gap-3">
+          <Button variant="secondary" className="flex-1" onClick={onCancel}>Cancel</Button>
+          <Button className="flex-1" onClick={() => onSave(data)}>Save Changes</Button>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
 
 const ExamPractice = ({ onCancel, onComplete }: { onCancel: () => void, onComplete: (score: number, total: number, subject: string, examType: string) => void }) => {
   const [selectedExamType, setSelectedExamType] = useState<string | null>(null);
@@ -672,25 +1244,32 @@ const ExamPractice = ({ onCancel, onComplete }: { onCancel: () => void, onComple
 
 // --- Main App ---
 
-const BuddyChatModal = ({ profile, onClose, initialMessage }: { profile: UserProfile, onClose: () => void, initialMessage?: string }) => {
-  const [messages, setMessages] = useState<{ role: 'user' | 'model' | 'buddy', text: string, timestamp: number }[]>([]);
+const BuddyChatModal = ({ user, profile, onClose, initialMessage }: { user: User | null, profile: UserProfile, onClose: () => void, initialMessage?: string }) => {
+  const [messages, setMessages] = useState<{ role: 'user' | 'model' | 'buddy', text: string, timestamp: number, senderId?: string }[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const chatRef = useRef<any>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const isAI = profile.buddyType === 'AI';
-  const roomId = `chat-${profile.uid}`;
+  
+  // Stable room ID for user-to-user chat
+  const roomId = isAI 
+    ? `chat-ai-${user?.uid}` 
+    : `chat-user-${[user?.uid, profile.buddyId].sort().join('-')}`;
 
   useEffect(() => {
+    if (!user) return;
+    
     // Join socket room for real-time chat
     socket.emit("join-room", roomId);
 
     const handleReceiveMessage = (data: any) => {
-      if (data.senderId !== profile.uid) {
+      if (data.senderId !== user.uid) {
         setMessages(prev => [...prev, { 
           role: 'buddy', 
           text: data.text, 
-          timestamp: data.timestamp 
+          timestamp: data.timestamp,
+          senderId: data.senderId
         }]);
       }
     };
@@ -700,14 +1279,14 @@ const BuddyChatModal = ({ profile, onClose, initialMessage }: { profile: UserPro
     return () => {
       socket.off("receive-message", handleReceiveMessage);
     };
-  }, [roomId, profile.uid]);
+  }, [roomId, user]);
 
   useEffect(() => {
     if (isAI && !chatRef.current && profile) {
       chatRef.current = createBuddyChat(profile);
       
       if (initialMessage) {
-        setMessages([{ role: 'user', text: initialMessage, timestamp: Date.now() }]);
+        setMessages([{ role: 'user', text: initialMessage, timestamp: Date.now(), senderId: user?.uid }]);
         handleSend(initialMessage);
       } else {
         setMessages([{ role: 'model', text: `Hey ${profile.displayName}! I'm Ace, your study buddy. How's your studying going today?`, timestamp: Date.now() }]);
@@ -715,11 +1294,12 @@ const BuddyChatModal = ({ profile, onClose, initialMessage }: { profile: UserPro
     } else if (!isAI && messages.length === 0) {
       setMessages([{ 
         role: 'buddy', 
-        text: `Hey ${profile.displayName}! I'm ready to study together. Send me a message!`, 
-        timestamp: Date.now() 
+        text: `Hey ${profile.displayName}! I'm ${profile.buddyName || 'your buddy'}. Ready to study together?`, 
+        timestamp: Date.now(),
+        senderId: profile.buddyId
       }]);
     }
-  }, [profile, initialMessage, isAI]);
+  }, [profile, initialMessage, isAI, user]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -729,19 +1309,19 @@ const BuddyChatModal = ({ profile, onClose, initialMessage }: { profile: UserPro
 
   const handleSend = async (customMsg?: string) => {
     const msgToSend = customMsg || input.trim();
-    if (!msgToSend || loading) return;
+    if (!msgToSend || loading || !user) return;
 
     const timestamp = Date.now();
 
     if (!customMsg) {
       setInput('');
-      setMessages(prev => [...prev, { role: 'user', text: msgToSend, timestamp }]);
+      setMessages(prev => [...prev, { role: 'user', text: msgToSend, timestamp, senderId: user.uid }]);
     }
 
     // Send via socket for real-time
     socket.emit("send-message", {
       roomId,
-      senderId: profile.uid,
+      senderId: user.uid,
       text: msgToSend,
       timestamp
     });
@@ -782,41 +1362,56 @@ const BuddyChatModal = ({ profile, onClose, initialMessage }: { profile: UserPro
         initial={{ y: '100%' }} 
         animate={{ y: 0 }} 
         exit={{ y: '100%' }}
-        className="bg-white w-full max-w-lg h-[85vh] sm:h-[600px] rounded-t-[32px] sm:rounded-[32px] flex flex-col overflow-hidden shadow-2xl shadow-black/20"
+        className="bg-[#E5DDD5] w-full max-w-lg h-[85vh] sm:h-[600px] rounded-t-[32px] sm:rounded-[32px] flex flex-col overflow-hidden shadow-2xl shadow-black/20"
       >
-        <div className="p-6 border-bottom border-zinc-100 flex justify-between items-center bg-zinc-900 text-white">
+        {/* WhatsApp Style Header */}
+        <div className="p-4 bg-[#075E54] text-white flex justify-between items-center shadow-md">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-900/20">
-              <Brain size={20} />
+            <button onClick={onClose} className="p-1 -ml-1 hover:bg-white/10 rounded-full sm:hidden">
+              <ArrowLeft size={20} />
+            </button>
+            <div className="w-10 h-10 rounded-full bg-zinc-200 flex items-center justify-center text-zinc-600 font-bold overflow-hidden">
+              {isAI ? <Brain size={24} className="text-emerald-600" /> : (profile.buddyName?.[0] || 'B')}
             </div>
             <div>
-              <h3 className="font-bold">Chat with {profile.buddyName || (profile.buddyType === 'AI' ? 'Ace' : 'Buddy')}</h3>
-              <p className="text-[10px] text-emerald-400 font-bold uppercase tracking-widest">{profile.buddyType === 'AI' ? 'AI Study Buddy' : `${profile.buddyType} Buddy`}</p>
+              <h3 className="font-bold text-sm">{profile.buddyName || (isAI ? 'Ace' : 'Buddy')}</h3>
+              <p className="text-[10px] text-emerald-100 opacity-80">{isAI ? 'Online' : 'Active Buddy'}</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-xl transition-colors">
-            <X size={20} />
-          </button>
+          <div className="flex items-center gap-4">
+            <button className="p-2 hover:bg-white/10 rounded-full"><Plus size={20} /></button>
+            <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full"><X size={20} /></button>
+          </div>
         </div>
 
-        <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-4 bg-zinc-50">
-          {messages.map((msg, i) => (
-            <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-[80%] p-4 rounded-2xl text-sm shadow-sm ${
-                msg.role === 'user' 
-                  ? 'bg-emerald-600 text-white rounded-tr-none' 
-                  : 'bg-white text-zinc-900 border border-zinc-100 rounded-tl-none'
-              }`}>
-                {msg.text}
-                <div className={`text-[8px] mt-1 opacity-50 ${msg.role === 'user' ? 'text-right' : 'text-left'}`}>
-                  {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        {/* WhatsApp Style Chat Area */}
+        <div 
+          ref={scrollRef} 
+          className="flex-1 overflow-y-auto p-4 space-y-2 bg-[url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png')] bg-repeat"
+        >
+          {messages.map((msg, i) => {
+            const isMe = msg.role === 'user';
+            return (
+              <div key={i} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[85%] px-3 py-2 rounded-lg text-sm shadow-sm relative ${
+                  isMe 
+                    ? 'bg-[#DCF8C6] text-zinc-900 rounded-tr-none' 
+                    : 'bg-white text-zinc-900 rounded-tl-none'
+                }`}>
+                  <p className="pr-12">{msg.text}</p>
+                  <div className="absolute bottom-1 right-2 flex items-center gap-1">
+                    <span className="text-[9px] text-zinc-400">
+                      {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                    {isMe && <Check size={10} className="text-blue-400" />}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
           {loading && (
             <div className="flex justify-start">
-              <div className="bg-white p-4 rounded-2xl rounded-tl-none border border-zinc-100 shadow-sm">
+              <div className="bg-white px-3 py-2 rounded-lg rounded-tl-none shadow-sm">
                 <div className="flex gap-1">
                   <div className="w-1.5 h-1.5 bg-zinc-300 rounded-full animate-bounce" />
                   <div className="w-1.5 h-1.5 bg-zinc-300 rounded-full animate-bounce [animation-delay:0.2s]" />
@@ -827,24 +1422,30 @@ const BuddyChatModal = ({ profile, onClose, initialMessage }: { profile: UserPro
           )}
         </div>
 
-        <div className="p-6 bg-white border-t border-zinc-100">
-          <div className="flex gap-2">
+        {/* WhatsApp Style Input Area */}
+        <div className="p-3 bg-[#F0F0F0] flex items-center gap-2">
+          <button className="p-2 text-zinc-500 hover:text-zinc-700 transition-colors">
+            <Plus size={24} />
+          </button>
+          <div className="flex-1 relative">
             <input 
               type="text" 
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-              placeholder="Type a message..."
-              className="flex-1 p-4 bg-zinc-50 border border-zinc-100 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600 transition-all"
+              placeholder="Type a message"
+              className="w-full py-2.5 px-4 bg-white rounded-full text-sm focus:outline-none shadow-sm"
             />
-            <Button 
-              onClick={handleSend} 
-              disabled={loading || !input.trim()}
-              className="p-4 aspect-square rounded-2xl"
-            >
-              <Zap size={20} />
-            </Button>
           </div>
+          <button 
+            onClick={handleSend} 
+            disabled={loading || !input.trim()}
+            className={`p-3 rounded-full transition-all shadow-md ${
+              !input.trim() ? 'bg-zinc-400 text-white' : 'bg-[#128C7E] text-white active:scale-95'
+            }`}
+          >
+            <Zap size={20} />
+          </button>
         </div>
       </motion.div>
     </div>
@@ -898,6 +1499,8 @@ export default function App() {
       const prevTab = tabHistory[tabHistory.length - 1];
       setTabHistory(prev => prev.slice(0, -1));
       setActiveTab(prevTab);
+    } else if (activeTab !== 'dashboard') {
+      setActiveTab('dashboard');
     }
   };
   const [showAbout, setShowAbout] = useState(false);
@@ -1755,6 +2358,14 @@ export default function App() {
         <div className="hidden lg:block" />
         <div className="flex items-center gap-2">
           <button 
+            onClick={() => navigate('notifications')}
+            className="p-2 text-zinc-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all relative"
+            title="Notifications"
+          >
+            <Bell size={20} />
+            <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full border-2 border-white"></span>
+          </button>
+          <button 
             onClick={() => {
               if (!isFocusMode) {
                 setTimer(25 * 60);
@@ -1787,7 +2398,7 @@ export default function App() {
             className="p-2 text-zinc-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
             title="Settings"
           >
-            <Settings size={20} />
+            <SettingsIcon size={20} />
           </button>
         </div>
       </header>
@@ -1805,7 +2416,7 @@ export default function App() {
           <NavButton active={activeTab === 'dashboard'} onClick={() => navigate('dashboard')} icon={LayoutDashboard} label="Home" />
           <NavButton active={activeTab === 'practice'} onClick={() => navigate('practice')} icon={BookOpen} label="Practice" />
           <NavButton active={activeTab === 'buddy'} onClick={() => navigate('buddy')} icon={MessageSquare} label="Buddy" />
-          <NavButton active={activeTab === 'settings'} onClick={() => navigate('settings')} icon={Settings} label="Settings" />
+          <NavButton active={activeTab === 'settings'} onClick={() => navigate('settings')} icon={SettingsIcon} label="Settings" />
         </div>
 
         <div className="hidden lg:flex flex-col gap-4 w-full mt-auto px-4">
@@ -1876,6 +2487,94 @@ export default function App() {
                   </div>
                 </div>
               </header>
+
+              {/* Quick Actions Grid */}
+              <div className="grid grid-cols-3 gap-4">
+                <button onClick={() => navigate('friends')} className="flex flex-col items-center gap-2 p-4 bg-white rounded-3xl border border-zinc-100 hover:border-emerald-200 transition-all group">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600 group-hover:scale-110 transition-transform">
+                    <Users size={24} />
+                  </div>
+                  <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Friends</span>
+                </button>
+                <button onClick={() => navigate('chat')} className="flex flex-col items-center gap-2 p-4 bg-white rounded-3xl border border-zinc-100 hover:border-emerald-200 transition-all group">
+                  <div className="w-12 h-12 rounded-2xl bg-violet-50 flex items-center justify-center text-violet-600 group-hover:scale-110 transition-transform">
+                    <MessageSquare size={24} />
+                  </div>
+                  <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Chat</span>
+                </button>
+                <button onClick={() => navigate('achievements')} className="flex flex-col items-center gap-2 p-4 bg-white rounded-3xl border border-zinc-100 hover:border-emerald-200 transition-all group">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-600 group-hover:scale-110 transition-transform">
+                    <Award size={24} />
+                  </div>
+                  <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Awards</span>
+                </button>
+              </div>
+
+              {/* Today's Tasks & Study Groups */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Card className="flex flex-col">
+                  <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-lg font-bold">Today's Tasks</h3>
+                    <button onClick={() => navigate('progress')} className="text-xs font-bold text-emerald-600 hover:underline">View All</button>
+                  </div>
+                  <div className="flex items-center gap-6 mb-6">
+                    <div className="relative w-20 h-20">
+                      <svg className="w-full h-full" viewBox="0 0 36 36">
+                        <path className="text-zinc-100" strokeDasharray="100, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3" />
+                        <path className="text-emerald-500" strokeDasharray="65, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3" />
+                      </svg>
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span className="text-sm font-bold">65%</span>
+                      </div>
+                    </div>
+                    <div className="flex-1 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                        <span className="text-xs font-medium">Mathematics Quiz</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                        <span className="text-xs font-medium">Physics Revision</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-zinc-200" />
+                        <span className="text-xs font-medium text-zinc-400">English Essay</span>
+                      </div>
+                    </div>
+                  </div>
+                  <Button variant="secondary" className="w-full" onClick={() => navigate('past-questions')}>
+                    Practice Past Questions
+                  </Button>
+                </Card>
+
+                <Card className="flex flex-col">
+                  <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-lg font-bold">Study Groups</h3>
+                    <button onClick={() => navigate('groups')} className="text-xs font-bold text-emerald-600 hover:underline">Join More</button>
+                  </div>
+                  <div className="space-y-4 flex-1">
+                    <div className="flex items-center gap-3 p-3 bg-zinc-50 rounded-2xl border border-zinc-100">
+                      <div className="w-10 h-10 rounded-xl bg-violet-100 text-violet-600 flex items-center justify-center text-xl">⚛️</div>
+                      <div className="flex-1">
+                        <p className="text-sm font-bold">Physics Squad</p>
+                        <p className="text-[10px] text-zinc-500">12 members online</p>
+                      </div>
+                      <button className="p-2 text-zinc-400 hover:text-emerald-600"><ChevronRight size={16} /></button>
+                    </div>
+                    <div className="flex items-center gap-3 p-3 bg-zinc-50 rounded-2xl border border-zinc-100">
+                      <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center text-xl">📐</div>
+                      <div className="flex-1">
+                        <p className="text-sm font-bold">Math Masters</p>
+                        <p className="text-[10px] text-zinc-500">8 members online</p>
+                      </div>
+                      <button className="p-2 text-zinc-400 hover:text-emerald-600"><ChevronRight size={16} /></button>
+                    </div>
+                  </div>
+                  <Button variant="secondary" className="w-full mt-4" onClick={() => navigate('leaderboard')} icon={TrendingUp}>
+                    View Leaderboard
+                  </Button>
+                </Card>
+              </div>
 
               {/* AI Buddy Message */}
               <Card className="bg-gradient-to-br from-emerald-600 to-emerald-700 text-white border-none relative overflow-hidden">
@@ -1971,17 +2670,36 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Wellness Integration */}
-              <section>
-                <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-                  <Sun size={20} className="text-amber-500" /> Wellness & Habits
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <WellnessCard icon={Coffee} title="Hydration Break" desc="Drink 250ml of water now." time="In 15 mins" />
-                  <WellnessCard icon={Moon} title="Sleep Reminder" desc="Wind down by 10:00 PM." time="Tonight" />
-                  <WellnessCard icon={Zap} title="Stretch" desc="Stand up and stretch for 2 mins." time="Now" />
-                </div>
-              </section>
+              {/* Wellness & Study Tips */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <section>
+                  <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                    <Sun size={20} className="text-amber-500" /> Wellness & Habits
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <WellnessCard icon={Coffee} title="Hydration" desc="Drink 250ml water." time="In 15 mins" />
+                    <WellnessCard icon={Zap} title="Stretch" desc="Stand up for 2 mins." time="Now" />
+                  </div>
+                </section>
+
+                <section>
+                  <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                    <Sparkles size={20} className="text-emerald-500" /> Study Tips
+                  </h3>
+                  <Card className="bg-white border-zinc-100 p-4 hover:border-emerald-200 transition-all cursor-pointer group" onClick={() => navigate('tips')}>
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600 group-hover:scale-110 transition-transform">
+                        <BookOpen size={24} />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-bold">Ace's Tip of the Day</p>
+                        <p className="text-xs text-zinc-500">"Try the Pomodoro technique for better focus."</p>
+                      </div>
+                      <ChevronRight size={16} className="text-zinc-300" />
+                    </div>
+                  </Card>
+                </section>
+              </div>
             </motion.div>
           )}
 
@@ -2028,6 +2746,105 @@ export default function App() {
                   ))}
                 </div>
               )}
+            </motion.div>
+          )}
+
+          {activeTab === 'progress' && (
+            <motion.div 
+              key="progress"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+            >
+              <Progress />
+            </motion.div>
+          )}
+
+          {activeTab === 'groups' && (
+            <motion.div 
+              key="groups"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+            >
+              <StudyGroups />
+            </motion.div>
+          )}
+
+          {activeTab === 'leaderboard' && (
+            <motion.div 
+              key="leaderboard"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+            >
+              <Leaderboard />
+            </motion.div>
+          )}
+
+          {activeTab === 'achievements' && (
+            <motion.div 
+              key="achievements"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+            >
+              <Achievements />
+            </motion.div>
+          )}
+
+          {activeTab === 'notifications' && (
+            <motion.div 
+              key="notifications"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+            >
+              <Notifications />
+            </motion.div>
+          )}
+
+          {activeTab === 'tips' && (
+            <motion.div 
+              key="tips"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+            >
+              <StudyTips />
+            </motion.div>
+          )}
+
+          {activeTab === 'chat' && (
+            <motion.div 
+              key="chat"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+            >
+              <StudyChat />
+            </motion.div>
+          )}
+
+          {activeTab === 'friends' && (
+            <motion.div 
+              key="friends"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+            >
+              <Friends />
+            </motion.div>
+          )}
+
+          {activeTab === 'past-questions' && (
+            <motion.div 
+              key="past-questions"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+            >
+              <PastQuestions onAction={(action: string) => action === 'back' && handleBack()} />
             </motion.div>
           )}
 
@@ -2228,7 +3045,7 @@ export default function App() {
                         <Users size={18} />
                       </button>
                       <button onClick={() => setShowBuddyEdit(true)} className="p-2 bg-white/10 rounded-xl hover:bg-white/20 transition-colors">
-                        <Settings size={18} />
+                        <SettingsIcon size={18} />
                       </button>
                     </div>
                   </div>
@@ -2784,6 +3601,7 @@ export default function App() {
       <AnimatePresence>
         {isChatOpen && profile && (
           <BuddyChatModal 
+            user={user}
             profile={profile} 
             onClose={() => {
               setIsChatOpen(false);
@@ -2969,7 +3787,7 @@ function BottomNav({ activeTab, onNavigate }: any) {
     { id: 'dashboard', icon: LayoutDashboard, label: 'Home' },
     { id: 'timetable', icon: Calendar, label: 'Planner' },
     { id: 'leaderboard', icon: Award, label: 'Rank' },
-    { id: 'settings', icon: Settings, label: 'Settings' },
+    { id: 'settings', icon: SettingsIcon, label: 'Settings' },
   ];
 
   return (
