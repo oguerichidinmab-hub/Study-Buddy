@@ -88,6 +88,30 @@
         "date": { "type": "string", "format": "date-time" }
       },
       "required": ["userId", "subject", "score", "totalQuestions", "date"]
+    },
+    "Friend": {
+      "title": "Friend",
+      "description": "A friend relationship between two users",
+      "type": "object",
+      "properties": {
+        "userIds": { "type": "array", "items": { "type": "string" } },
+        "status": { "type": "string", "enum": ["accepted", "pending"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userIds", "status", "createdAt"]
+    },
+    "ChatMessage": {
+      "title": "ChatMessage",
+      "description": "A message sent between two users",
+      "type": "object",
+      "properties": {
+        "senderId": { "type": "string" },
+        "receiverId": { "type": "string" },
+        "text": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "roomId": { "type": "string" }
+      },
+      "required": ["senderId", "receiverId", "text", "createdAt", "roomId"]
     }
   },
   "firestore": {
@@ -106,6 +130,14 @@
     "/quizResults/{resultId}": {
       "schema": "QuizResult",
       "description": "User quiz results"
+    },
+    "/friends/{friendId}": {
+      "schema": "Friend",
+      "description": "Friend relationships"
+    },
+    "/chats/{messageId}": {
+      "schema": "ChatMessage",
+      "description": "Chat messages between users"
     }
   }
 }

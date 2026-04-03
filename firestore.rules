@@ -47,6 +47,22 @@ service cloud.firestore {
     //   - totalQuestions: number (required, > 0)
     //   - date: string (required, date-time)
     //
+    // Collection: friends
+    // Document ID: auto-generated
+    // Fields:
+    //   - userIds: list (required, contains exactly 2 uids)
+    //   - status: string (required, enum: accepted, pending)
+    //   - createdAt: string (required, date-time)
+    //
+    // Collection: chats
+    // Document ID: auto-generated
+    // Fields:
+    //   - senderId: string (required, matches request.auth.uid)
+    //   - receiverId: string (required)
+    //   - text: string (required, < 1000 chars)
+    //   - createdAt: string (required, date-time)
+    //   - roomId: string (required)
+    //
     // ===============================================================
 
     // ===============================================================
@@ -136,12 +152,30 @@ service cloud.firestore {
              isValidDateString(data.date);
     }
 
+    function isValidFriend(data) {
+      return hasRequiredFields(['userIds', 'status', 'createdAt']) &&
+             data.userIds is list && data.userIds.size() == 2 &&
+             request.auth.uid in data.userIds &&
+             data.status in ['accepted', 'pending'] &&
+             isValidDateString(data.createdAt);
+    }
+
+    function isValidChatMessage(data) {
+      return hasRequiredFields(['senderId', 'receiverId', 'text', 'createdAt', 'roomId']) &&
+             data.senderId == request.auth.uid &&
+             data.receiverId is string &&
+             data.text is string && data.text.size() > 0 && data.text.size() < 1000 &&
+             isValidDateString(data.createdAt) &&
+             data.roomId is string;
+    }
+
     // ===============================================================
     // Rules
     // ===============================================================
 
     match /users/{userId} {
-      allow read: if isOwner(userId) || isAdmin();
+      // Allow searching for users by email or uid for friend requests
+      allow read: if isAuthenticated(); 
       allow create: if isOwner(userId) && isValidUser(request.resource.data);
       allow update: if isOwner(userId) && isValidUser(request.resource.data) && 
                     request.resource.data.uid == resource.data.uid &&
@@ -171,6 +205,21 @@ service cloud.firestore {
       allow update: if isDocOwner() && isRequestOwner() && isValidQuizResult(request.resource.data) &&
                     request.resource.data.userId == resource.data.userId;
       allow delete: if isDocOwner() || isAdmin();
+    }
+
+    match /friends/{friendId} {
+      allow read: if isAuthenticated() && request.auth.uid in resource.data.userIds;
+      allow create: if isAuthenticated() && isValidFriend(request.resource.data);
+      allow update: if isAuthenticated() && request.auth.uid in resource.data.userIds && 
+                    isValidFriend(request.resource.data) &&
+                    request.resource.data.userIds == resource.data.userIds;
+      allow delete: if isAuthenticated() && request.auth.uid in resource.data.userIds;
+    }
+
+    match /chats/{messageId} {
+      allow read: if isAuthenticated() && (request.auth.uid == resource.data.senderId || request.auth.uid == resource.data.receiverId);
+      allow create: if isAuthenticated() && isValidChatMessage(request.resource.data);
+      allow update, delete: if false; // Messages are immutable
     }
 
     // Default deny

@@ -10,7 +10,7 @@ import {
   updatePassword, reauthenticateWithCredential, EmailAuthProvider, sendPasswordResetEmail
 } from './firebase';
 import { 
-  doc, getDoc, setDoc, updateDoc, collection, query, where, onSnapshot, addDoc, serverTimestamp, Timestamp 
+  doc, getDoc, setDoc, updateDoc, collection, query, where, onSnapshot, addDoc, getDocs, serverTimestamp, Timestamp 
 } from 'firebase/firestore';
 import { 
   BookOpen, Calendar, CheckCircle, Clock, LayoutDashboard, LogOut, 
@@ -64,11 +64,11 @@ const Card = ({ children, className = '', id, onClick }: any) => (
 
 const Badge = ({ children, color = 'emerald' }: any) => {
   const colors: any = {
-    emerald: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-    violet: 'bg-violet-500/10 text-violet-400 border-violet-500/20',
-    amber: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-    rose: 'bg-rose-500/10 text-rose-400 border-rose-500/20',
-    blue: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+    emerald: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20',
+    violet: 'bg-violet-500/10 text-violet-500 border-violet-500/20',
+    amber: 'bg-amber-500/10 text-amber-500 border-amber-500/20',
+    rose: 'bg-rose-500/10 text-rose-500 border-rose-500/20',
+    blue: 'bg-blue-500/10 text-blue-500 border-blue-500/20',
   };
   return (
     <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${colors[color]}`}>
@@ -209,13 +209,21 @@ const Quiz = ({ subject, educationLevel, targetExams, cachedQuestions, onCacheQu
   );
 };
 
-const Friends = ({ user }: any) => {
-  const friends = [
-    { name: 'Emma', status: 'online', avatar: 'https://picsum.photos/seed/emma/100/100' },
-    { name: 'Ryan', status: 'online', avatar: 'https://picsum.photos/seed/ryan/100/100' },
-    { name: 'Liam', status: 'away', avatar: 'https://picsum.photos/seed/liam/100/100' },
-    { name: 'Sophia', status: 'offline', avatar: 'https://picsum.photos/seed/sophia/100/100' },
-  ];
+const Friends = ({ user, friends, friendProfiles, onAddFriend }: any) => {
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [friendEmail, setFriendEmail] = useState('');
+
+  const friendList = friends.map((f: any) => {
+    const otherId = f.userIds.find((id: string) => id !== user.uid);
+    const profile = friendProfiles[otherId];
+    return {
+      id: otherId,
+      name: profile?.displayName || 'Loading...',
+      email: profile?.email || '',
+      status: 'online', // In a real app, we'd track online status
+      avatar: `https://picsum.photos/seed/${otherId}/100/100`
+    };
+  });
 
   return (
     <div className="flex-1 overflow-y-auto pb-32 p-6">
@@ -225,27 +233,71 @@ const Friends = ({ user }: any) => {
           <Users size={20} />
         </button>
       </div>
+      
       <div className="space-y-4">
-        {friends.map((friend, i) => (
-          <Card key={i} className="flex items-center gap-4 p-4">
-            <div className="relative">
-              <img src={friend.avatar} alt={friend.name} className="w-12 h-12 rounded-2xl object-cover" referrerPolicy="no-referrer" />
-              <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-bg-card ${
-                friend.status === 'online' ? 'bg-emerald-500' : 
-                friend.status === 'away' ? 'bg-amber-500' : 'bg-slate-500'
-              }`} />
-            </div>
-            <div className="flex-1">
-              <h3 className="font-bold">{friend.name}</h3>
-              <p className="text-xs text-text-secondary capitalize">{friend.status}</p>
-            </div>
-            <button className="p-2 text-text-secondary hover:text-brand-primary transition-colors">
-              <MessageSquare size={20} />
-            </button>
+        {friendList.length === 0 ? (
+          <Card className="p-8 text-center">
+            <Users className="mx-auto text-zinc-200 mb-4" size={48} />
+            <p className="text-text-secondary">No friends yet. Add some study buddies!</p>
           </Card>
-        ))}
+        ) : (
+          friendList.map((friend: any, i: number) => (
+            <Card key={i} className="flex items-center gap-4 p-4">
+              <div className="relative">
+                <img src={friend.avatar} alt={friend.name} className="w-12 h-12 rounded-2xl object-cover" referrerPolicy="no-referrer" />
+                <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-bg-card ${
+                  friend.status === 'online' ? 'bg-emerald-500' : 
+                  friend.status === 'away' ? 'bg-amber-500' : 'bg-slate-500'
+                }`} />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-bold">{friend.name}</h3>
+                <p className="text-xs text-text-secondary capitalize">{friend.status}</p>
+              </div>
+              <button className="p-2 text-text-secondary hover:text-brand-primary transition-colors">
+                <MessageSquare size={20} />
+              </button>
+            </Card>
+          ))
+        )}
       </div>
-      <Button className="w-full mt-8" icon={Plus}>Add New Friend</Button>
+      
+      <Button className="w-full mt-8" icon={Plus} onClick={() => setShowAddModal(true)}>Add New Friend</Button>
+
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-6">
+          <Card className="max-w-md w-full p-8 space-y-6">
+            <div className="flex justify-between items-center">
+              <h3 className="text-2xl font-bold">Add Study Buddy</h3>
+              <button onClick={() => setShowAddModal(false)} className="p-2 hover:bg-zinc-100 rounded-full"><X size={20} /></button>
+            </div>
+            <div className="space-y-4">
+              <p className="text-text-secondary text-sm">Enter your friend's email address to add them to your study circle.</p>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-text-secondary uppercase tracking-widest">Friend's Email</label>
+                <input 
+                  type="email" 
+                  value={friendEmail}
+                  onChange={(e) => setFriendEmail(e.target.value)}
+                  placeholder="buddy@example.com"
+                  className="w-full p-4 bg-zinc-50 border border-zinc-100 rounded-2xl focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+              <Button 
+                className="w-full py-4" 
+                onClick={() => {
+                  onAddFriend(friendEmail);
+                  setShowAddModal(false);
+                  setFriendEmail('');
+                }}
+                disabled={!friendEmail}
+              >
+                Send Request
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
     </div>
   );
 };
@@ -575,7 +627,11 @@ const PastQuestions = ({ onAction }: any) => {
         {subjects.map((s, i) => (
           <Card key={i} className="p-4 flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className={`w-10 h-10 rounded-xl bg-brand-${s.color}/20 text-brand-${s.color} flex items-center justify-center`}>
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                s.color === 'emerald' ? 'bg-emerald-500/10 text-emerald-400' :
+                s.color === 'blue' ? 'bg-blue-500/10 text-blue-400' :
+                s.color === 'rose' ? 'bg-rose-500/10 text-rose-400' : 'bg-violet-500/10 text-violet-400'
+              }`}>
                 <BookOpen size={20} />
               </div>
               <span className="font-bold">{s.name}</span>
@@ -862,7 +918,7 @@ const Settings = ({ user, onAction, onLogout }: any) => {
           </Card>
         </div>
 
-        <Button variant="danger" className="w-full py-4 mt-8" onClick={onLogout}>
+        <Button variant="danger" className="w-full py-4 mt-8" onClick={() => onLogout()}>
           Log Out
         </Button>
       </div>
@@ -962,13 +1018,13 @@ const EditBuddyModal = ({ profile, onSave, onCancel }: any) => {
           {data.buddyType !== 'AI' && (
             <div className="space-y-4">
               <div>
-                <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-2">Listening Rate (1-5)</label>
+                <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Listening Rate (1-5)</label>
                 <div className="flex justify-between">
                   {[1, 2, 3, 4, 5].map(num => (
                     <button 
                       key={num}
                       onClick={() => setData({ ...data, buddyRating: num })}
-                      className={`w-8 h-8 rounded-full flex items-center justify-center text-xs border ${data.buddyRating === num ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-zinc-400 border-zinc-100'}`}
+                      className={`w-8 h-8 rounded-full flex items-center justify-center text-xs border ${data.buddyRating === num ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-zinc-500 border-zinc-100'}`}
                     >
                       {num}
                     </button>
@@ -979,16 +1035,16 @@ const EditBuddyModal = ({ profile, onSave, onCancel }: any) => {
               <div className="flex items-center justify-between">
                 <span className="text-xs text-zinc-600">Always pick calls?</span>
                 <div className="flex gap-2">
-                  <button onClick={() => setData({ ...data, buddyAlwaysPicksCalls: true })} className={`px-3 py-1 rounded-lg text-[10px] border ${data.buddyAlwaysPicksCalls ? 'bg-emerald-600 text-white' : 'bg-white text-zinc-400'}`}>Yes</button>
-                  <button onClick={() => setData({ ...data, buddyAlwaysPicksCalls: false })} className={`px-3 py-1 rounded-lg text-[10px] border ${!data.buddyAlwaysPicksCalls ? 'bg-emerald-600 text-white' : 'bg-white text-zinc-400'}`}>No</button>
+                  <button onClick={() => setData({ ...data, buddyAlwaysPicksCalls: true })} className={`px-3 py-1 rounded-lg text-[10px] border ${data.buddyAlwaysPicksCalls ? 'bg-emerald-600 text-white' : 'bg-white text-zinc-500'}`}>Yes</button>
+                  <button onClick={() => setData({ ...data, buddyAlwaysPicksCalls: false })} className={`px-3 py-1 rounded-lg text-[10px] border ${!data.buddyAlwaysPicksCalls ? 'bg-emerald-600 text-white' : 'bg-white text-zinc-500'}`}>No</button>
                 </div>
               </div>
 
               <div className="flex items-center justify-between">
                 <span className="text-xs text-zinc-600">Cares about studies?</span>
                 <div className="flex gap-2">
-                  <button onClick={() => setData({ ...data, buddyCaresAboutStudies: true })} className={`px-3 py-1 rounded-lg text-[10px] border ${data.buddyCaresAboutStudies ? 'bg-emerald-600 text-white' : 'bg-white text-zinc-400'}`}>Yes</button>
-                  <button onClick={() => setData({ ...data, buddyCaresAboutStudies: false })} className={`px-3 py-1 rounded-lg text-[10px] border ${!data.buddyCaresAboutStudies ? 'bg-emerald-600 text-white' : 'bg-white text-zinc-400'}`}>No</button>
+                  <button onClick={() => setData({ ...data, buddyCaresAboutStudies: true })} className={`px-3 py-1 rounded-lg text-[10px] border ${data.buddyCaresAboutStudies ? 'bg-emerald-600 text-white' : 'bg-white text-zinc-500'}`}>Yes</button>
+                  <button onClick={() => setData({ ...data, buddyCaresAboutStudies: false })} className={`px-3 py-1 rounded-lg text-[10px] border ${!data.buddyCaresAboutStudies ? 'bg-emerald-600 text-white' : 'bg-white text-zinc-500'}`}>No</button>
                 </div>
               </div>
             </div>
@@ -1004,7 +1060,7 @@ const EditBuddyModal = ({ profile, onSave, onCancel }: any) => {
   );
 };
 
-const ExamPractice = ({ onCancel, onComplete }: { onCancel: () => void, onComplete: (score: number, total: number, subject: string, examType: string) => void }) => {
+const ExamPractice = ({ onCancel, onComplete, setToast }: { onCancel: () => void, onComplete: (score: number, total: number, subject: string, examType: string) => void, setToast: (t: any) => void }) => {
   const [selectedExamType, setSelectedExamType] = useState<string | null>(null);
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
@@ -1025,7 +1081,7 @@ const ExamPractice = ({ onCancel, onComplete }: { onCancel: () => void, onComple
     if (selectedYear) filtered = filtered.filter(q => q.year === selectedYear);
     
     if (filtered.length === 0) {
-      alert("No questions found for this selection.");
+      setToast({ title: 'No Questions', message: 'No questions found for this selection.', type: 'info' });
       return;
     }
 
@@ -1072,7 +1128,7 @@ const ExamPractice = ({ onCancel, onComplete }: { onCancel: () => void, onComple
     const hasAnswered = userAnswers[currentIdx] !== null;
 
     return (
-      <div className="fixed inset-0 bg-white z-[110] flex flex-col p-6 overflow-y-auto">
+      <div className="fixed inset-0 bg-zinc-50 z-[110] flex flex-col p-6 overflow-y-auto">
         <div className="flex justify-between items-center mb-8">
           <div>
             <Badge color="violet">{q.examType} Practice</Badge>
@@ -1083,9 +1139,9 @@ const ExamPractice = ({ onCancel, onComplete }: { onCancel: () => void, onComple
           </button>
         </div>
 
-        <div className="flex-1 max-w-2xl mx-auto w-full pb-24">
+        <div className="flex-1 max-w-2xl mx-auto w-full pb-32">
           <div className="flex justify-between items-center mb-4">
-            <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Question {currentIdx + 1} of {questions.length}</p>
+            <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Question {currentIdx + 1} of {questions.length}</p>
             <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">Score: {score}</p>
           </div>
 
@@ -1107,7 +1163,7 @@ const ExamPractice = ({ onCancel, onComplete }: { onCancel: () => void, onComple
                   onClick={() => handleAnswer(idx)}
                   className={`w-full p-4 text-left rounded-2xl border transition-all flex items-center gap-4 ${style} ${!hasAnswered ? 'hover:border-emerald-600 hover:bg-emerald-50' : ''}`}
                 >
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold ${hasAnswered && idx === q.correctAnswer ? 'bg-emerald-600 text-white' : 'bg-zinc-50 text-zinc-400'}`}>
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold ${hasAnswered && idx === q.correctAnswer ? 'bg-emerald-600 text-white' : 'bg-zinc-50 text-zinc-500'}`}>
                     {String.fromCharCode(65 + idx)}
                   </div>
                   <span className="font-medium">{opt}</span>
@@ -1118,7 +1174,7 @@ const ExamPractice = ({ onCancel, onComplete }: { onCancel: () => void, onComple
 
           {showExplanation && (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-8 p-4 bg-zinc-50 rounded-2xl border border-zinc-100">
-              <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-2">Explanation</p>
+              <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Explanation</p>
               <p className="text-sm text-zinc-600 leading-relaxed">{q.explanation}</p>
             </motion.div>
           )}
@@ -1175,7 +1231,7 @@ const ExamPractice = ({ onCancel, onComplete }: { onCancel: () => void, onComple
       <div className="space-y-8 max-w-md mx-auto w-full pb-12">
         {!selectedExamType ? (
           <div>
-            <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-3">Select Exam Type</label>
+            <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3">Select Exam Type</label>
             <div className="grid grid-cols-1 gap-2">
               {examTypes.map(type => (
                 <button 
@@ -1184,14 +1240,14 @@ const ExamPractice = ({ onCancel, onComplete }: { onCancel: () => void, onComple
                   className="p-4 rounded-2xl border border-zinc-100 text-left hover:border-emerald-600 hover:bg-emerald-50 transition-all flex justify-between items-center"
                 >
                   <span className="font-bold">{type}</span>
-                  <ChevronRight size={18} className="text-zinc-400" />
+                  <ChevronRight size={18} className="text-zinc-500" />
                 </button>
               ))}
             </div>
           </div>
         ) : !selectedSubject ? (
           <div>
-            <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-3">Select Subject for {selectedExamType}</label>
+            <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3">Select Subject for {selectedExamType}</label>
             <div className="grid grid-cols-1 gap-2">
               {subjects.map(s => (
                 <button 
@@ -1200,7 +1256,7 @@ const ExamPractice = ({ onCancel, onComplete }: { onCancel: () => void, onComple
                   className="p-4 rounded-2xl border border-zinc-100 text-left hover:border-emerald-600 hover:bg-emerald-50 transition-all flex justify-between items-center"
                 >
                   <span className="font-bold">{s}</span>
-                  <ChevronRight size={18} className="text-zinc-400" />
+                  <ChevronRight size={18} className="text-zinc-500" />
                 </button>
               ))}
             </div>
@@ -1208,7 +1264,7 @@ const ExamPractice = ({ onCancel, onComplete }: { onCancel: () => void, onComple
         ) : (
           <>
             <div>
-              <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-3">Select Year (Optional)</label>
+              <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3">Select Year (Optional)</label>
               <div className="flex flex-wrap gap-2">
                 <button 
                   onClick={() => setSelectedYear(null)}
@@ -1244,18 +1300,20 @@ const ExamPractice = ({ onCancel, onComplete }: { onCancel: () => void, onComple
 
 // --- Main App ---
 
-const BuddyChatModal = ({ user, profile, onClose, initialMessage }: { user: User | null, profile: UserProfile, onClose: () => void, initialMessage?: string }) => {
+const BuddyChatModal = ({ user, profile, onClose, initialMessage, isAI: propIsAI, buddy }: { user: User | null, profile: UserProfile, onClose: () => void, initialMessage?: string, isAI?: boolean, buddy?: any }) => {
   const [messages, setMessages] = useState<{ role: 'user' | 'model' | 'buddy', text: string, timestamp: number, senderId?: string }[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const chatRef = useRef<any>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const isAI = profile.buddyType === 'AI';
+  const isAI = propIsAI !== undefined ? propIsAI : profile.buddyType === 'AI';
+  const buddyName = isAI ? 'Ace' : (buddy?.displayName || profile.buddyName || 'Buddy');
+  const buddyId = isAI ? 'ai' : (buddy?.uid || profile.buddyId);
   
   // Stable room ID for user-to-user chat
   const roomId = isAI 
     ? `chat-ai-${user?.uid}` 
-    : `chat-user-${[user?.uid, profile.buddyId].sort().join('-')}`;
+    : `chat-user-${[user?.uid, buddyId].sort().join('-')}`;
 
   useEffect(() => {
     if (!user) return;
@@ -1371,10 +1429,10 @@ const BuddyChatModal = ({ user, profile, onClose, initialMessage }: { user: User
               <ArrowLeft size={20} />
             </button>
             <div className="w-10 h-10 rounded-full bg-zinc-200 flex items-center justify-center text-zinc-600 font-bold overflow-hidden">
-              {isAI ? <Brain size={24} className="text-emerald-600" /> : (profile.buddyName?.[0] || 'B')}
+              {isAI ? <Brain size={24} className="text-emerald-600" /> : (buddyName?.[0] || 'B')}
             </div>
             <div>
-              <h3 className="font-bold text-sm">{profile.buddyName || (isAI ? 'Ace' : 'Buddy')}</h3>
+              <h3 className="font-bold text-sm">{buddyName}</h3>
               <p className="text-[10px] text-emerald-100 opacity-80">{isAI ? 'Online' : 'Active Buddy'}</p>
             </div>
           </div>
@@ -1439,7 +1497,7 @@ const BuddyChatModal = ({ user, profile, onClose, initialMessage }: { user: User
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSend()}
               placeholder="Type a message"
-              className="w-full py-2.5 px-4 bg-white rounded-full text-sm focus:outline-none shadow-sm"
+              className="w-full py-2.5 px-4 bg-white rounded-full text-sm text-zinc-900 focus:outline-none shadow-sm"
             />
           </div>
           <button 
@@ -1537,6 +1595,8 @@ export default function App() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatInitialMessage, setChatInitialMessage] = useState<string | null>(null);
   const [showExamPractice, setShowExamPractice] = useState(false);
+  const [chatType, setChatType] = useState<'AI' | 'Buddy'>('AI');
+  const [selectedBuddy, setSelectedBuddy] = useState<any>(null);
   const [showBuddyEdit, setShowBuddyEdit] = useState(false);
   const [newSubject, setNewSubject] = useState('');
   const [email, setEmail] = useState('');
@@ -1553,6 +1613,15 @@ export default function App() {
   const [showProgress, setShowProgress] = useState(false);
   const [showPastQuestions, setShowPastQuestions] = useState(false);
   const [showTimetable, setShowTimetable] = useState(false);
+  const [friends, setFriends] = useState<any[]>([]);
+  const friendProfilesRef = useRef<{ [key: string]: UserProfile }>({});
+  const [friendProfiles, setFriendProfiles] = useState<{ [key: string]: UserProfile }>({});
+
+  // Sync ref with state
+  useEffect(() => {
+    friendProfilesRef.current = friendProfiles;
+  }, [friendProfiles]);
+  const [friendRequests, setFriendRequests] = useState<any[]>([]);
 
   const handleResetPassword = async (customEmail?: string) => {
     const emailToReset = customEmail || email;
@@ -1569,6 +1638,8 @@ export default function App() {
     }
   };
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [showForgotPasswordModal, setShowForgotPasswordModal] = useState(false);
 
   // --- Auth & Profile ---
 
@@ -1652,6 +1723,7 @@ export default function App() {
   const handleLogout = async () => {
     try {
       await signOut(auth);
+      setShowLogoutConfirm(false);
     } catch (error) {
       console.error('Logout failed:', error);
     }
@@ -1680,6 +1752,87 @@ export default function App() {
 
     return unsubscribe;
   }, [user, isAuthReady]);
+
+  // --- Friends Listeners ---
+  useEffect(() => {
+    if (!user || !isAuthReady) return;
+
+    const q = query(collection(db, 'friends'), where('userIds', 'array-contains', user.uid));
+    
+    const unsubscribe = onSnapshot(q, async (snapshot) => {
+      const friendsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setFriends(friendsData);
+
+      // Fetch profiles for friends
+      const otherUserIds = friendsData.map((f: any) => f.userIds.find((id: string) => id !== user.uid));
+      const uniqueIds = Array.from(new Set(otherUserIds)).filter(id => !!id && !friendProfilesRef.current[id]);
+
+      if (uniqueIds.length > 0) {
+        const newProfiles: { [key: string]: UserProfile } = { ...friendProfilesRef.current };
+        for (const id of uniqueIds) {
+          try {
+            const pDoc = await getDoc(doc(db, 'users', id as string));
+            if (pDoc.exists()) {
+              newProfiles[id as string] = pDoc.data() as UserProfile;
+            }
+          } catch (err) {
+            console.error('Error fetching friend profile:', err);
+          }
+        }
+        setFriendProfiles(newProfiles);
+      }
+    }, (error) => {
+      try {
+        handleFirestoreError(error, OperationType.LIST, 'friends');
+      } catch (e) {}
+    });
+
+    return unsubscribe;
+  }, [user, isAuthReady]);
+
+  const handleAddFriend = async (friendEmail: string) => {
+    if (!user || !friendEmail) return;
+    if (friendEmail === user.email) {
+      setToast({ title: 'Invalid Email', message: "You can't add yourself as a friend.", type: 'warning' });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Find user by email
+      const q = query(collection(db, 'users'), where('email', '==', friendEmail));
+      const querySnapshot = await getDocs(q);
+      
+      if (querySnapshot.empty) {
+        setToast({ title: 'User Not Found', message: 'No user found with that email address.', type: 'error' });
+        return;
+      }
+
+      const friendUser = querySnapshot.docs[0].data() as UserProfile;
+      const friendId = friendUser.uid;
+
+      // Check if already friends
+      const existing = friends.find((f: any) => f.userIds.includes(friendId));
+      if (existing) {
+        setToast({ title: 'Already Friends', message: `You are already friends with ${friendUser.displayName}.`, type: 'info' });
+        return;
+      }
+
+      // Add friend relationship
+      await addDoc(collection(db, 'friends'), {
+        userIds: [user.uid, friendId].sort(),
+        status: 'accepted', // For now, direct add. In a real app, this would be 'pending'
+        createdAt: new Date().toISOString()
+      });
+
+      setToast({ title: 'Friend Added', message: `${friendUser.displayName} is now your study buddy!`, type: 'success' });
+    } catch (error) {
+      console.error('Error adding friend:', error);
+      setToast({ title: 'Error', message: 'Failed to add friend. Please try again.', type: 'error' });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // --- AI Logic ---
 
@@ -2284,7 +2437,7 @@ export default function App() {
                   {!isSignUp && (
                     <button 
                       type="button"
-                      onClick={() => handleResetPassword()}
+                      onClick={() => setShowForgotPasswordModal(true)}
                       className="text-[10px] font-bold text-emerald-600 hover:underline"
                     >
                       Forgot Password?
@@ -2342,11 +2495,12 @@ export default function App() {
   const isPasswordUser = user?.providerData.some(p => p.providerId === 'password');
 
   return (
-    <div className={`min-h-screen bg-zinc-50 pb-32 lg:pb-0 lg:pl-64 pt-20 ${accessibilitySettings.highContrast ? 'contrast-125' : ''} ${accessibilitySettings.largeText ? 'text-lg' : ''}`}>
+    <>
+      <div className={`min-h-screen bg-zinc-50 pb-24 lg:pb-0 lg:pl-64 pt-20 ${accessibilitySettings.highContrast ? 'contrast-125' : ''} ${accessibilitySettings.largeText ? 'text-lg' : ''}`}>
       {/* Top Bar / Quick Menu */}
       <header className="fixed top-0 left-0 right-0 h-16 bg-white/90 backdrop-blur-md border-b border-zinc-100 z-40 lg:left-64 flex items-center justify-between px-6 shadow-sm">
         <div className="flex items-center gap-3">
-          {(tabHistory.length > 0 || activeQuiz || showExamPractice || showBuddyEdit || showAbout || showChangePasswordModal || isChatOpen || isFocusMode) && (
+          {(activeTab !== 'dashboard' && (tabHistory.length > 0 || activeQuiz || showExamPractice || showBuddyEdit || showAbout || showChangePasswordModal || isChatOpen || isFocusMode)) && (
             <button 
               onClick={handleBack}
               className="p-2 -ml-2 text-zinc-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
@@ -2409,7 +2563,7 @@ export default function App() {
       </header>
 
       {/* Sidebar (Desktop) / Bottom Nav (Mobile) */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-zinc-100 px-4 py-2 flex justify-around items-center z-50 lg:top-0 lg:bottom-0 lg:left-0 lg:w-64 lg:flex-col lg:border-r lg:border-t-0 lg:py-10 lg:px-6 shadow-[0_-4px_20px_rgba(0,0,0,0.03)]">
+      <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-zinc-100 px-4 py-2 pb-[env(safe-area-inset-bottom,12px)] flex justify-around items-center z-50 lg:top-0 lg:bottom-0 lg:left-0 lg:w-64 lg:flex-col lg:border-r lg:border-t-0 lg:py-10 lg:px-6 shadow-[0_-4px_20px_rgba(0,0,0,0.03)]">
         <div className="hidden lg:flex items-center gap-3 mb-12 px-4">
           <div className="w-10 h-10 bg-emerald-600 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-100">
             <Sparkles className="text-white" size={20} />
@@ -2435,7 +2589,7 @@ export default function App() {
                 <p className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider">Free Plan</p>
               </div>
             </div>
-            <button onClick={handleLogout} className="text-xs text-red-500 font-bold flex items-center gap-2 hover:text-red-600 transition-colors">
+            <button onClick={() => setShowLogoutConfirm(true)} className="text-xs text-red-500 font-bold flex items-center gap-2 hover:text-red-600 transition-colors">
               <LogOut size={14} /> Sign Out
             </button>
           </div>
@@ -2698,7 +2852,7 @@ export default function App() {
                       </div>
                       <div className="flex-1">
                         <p className="text-sm font-bold">Ace's Tip of the Day</p>
-                        <p className="text-xs text-zinc-500">"Try the Pomodoro technique for better focus."</p>
+                        <p className="text-xs text-text-secondary">"Try the Pomodoro technique for better focus."</p>
                       </div>
                       <ChevronRight size={16} className="text-zinc-300" />
                     </div>
@@ -2838,7 +2992,12 @@ export default function App() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
             >
-              <Friends />
+              <Friends 
+                user={user} 
+                friends={friends} 
+                friendProfiles={friendProfiles} 
+                onAddFriend={handleAddFriend} 
+              />
             </motion.div>
           )}
 
@@ -2875,7 +3034,7 @@ export default function App() {
                 )}
               </header>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pb-20">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pb-24">
                 {/* Exam Practice Card */}
                 <Card className="col-span-full bg-violet-600 text-white border-none p-8 relative overflow-hidden group cursor-pointer" onClick={() => setShowExamPractice(true)}>
                   <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -3002,7 +3161,7 @@ export default function App() {
                 })}
                 {(!profile?.subjects || profile.subjects.length === 0) && (
                   <div className="col-span-full text-center py-12">
-                    <p className="text-zinc-500">Add subjects in settings to start practicing.</p>
+                    <p className="text-text-secondary">Add subjects in settings to start practicing.</p>
                   </div>
                 )}
               </div>
@@ -3019,7 +3178,7 @@ export default function App() {
             >
               <header>
                 <h2 className="text-2xl font-bold tracking-tight">Buddy Hub</h2>
-                <p className="text-zinc-500">Manage your study companion and accountability partners.</p>
+                <p className="text-text-secondary">Manage your study companion and accountability partners.</p>
               </header>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -3057,7 +3216,7 @@ export default function App() {
                     
                     <div className="space-y-6 mb-8">
                       <div className="bg-white/5 rounded-2xl p-4">
-                        <p className="text-zinc-300 italic text-sm mb-4">
+                        <p className="text-zinc-100 italic text-sm mb-4">
                           {isBuddyLoading ? "Ace is thinking..." : `"${buddyMessage.message}"`}
                         </p>
                         {!isBuddyLoading && buddyMessage.suggestions && buddyMessage.suggestions.length > 0 && (
@@ -3066,10 +3225,12 @@ export default function App() {
                               <button 
                                 key={i}
                                 onClick={() => {
+                                  setChatType('AI');
+                                  setSelectedBuddy(null);
                                   setChatInitialMessage(suggestion);
                                   setIsChatOpen(true);
                                 }}
-                                className="px-3 py-1 bg-white/10 hover:bg-white/20 rounded-full text-[10px] text-zinc-300 transition-colors"
+                                className="px-3 py-1 bg-white/10 hover:bg-white/20 rounded-full text-[10px] text-zinc-100 transition-colors"
                               >
                                 {suggestion}
                               </button>
@@ -3139,26 +3300,71 @@ export default function App() {
                       )}
                     </div>
 
-                    <Button 
-                      className="w-full bg-emerald-600 hover:bg-emerald-700 border-none" 
-                      icon={MessageSquare}
-                      onClick={() => setIsChatOpen(true)}
-                    >
-                      {profile?.buddyType === 'AI' ? 'Chat with Ace' : `Chat with ${profile?.buddyName || 'Buddy'}`}
-                    </Button>
+                    <div className="grid grid-cols-2 gap-4">
+                      <Button 
+                        className="w-full bg-emerald-600 hover:bg-emerald-700 border-none text-xs" 
+                        icon={Brain}
+                        onClick={() => {
+                          setChatType('AI');
+                          setSelectedBuddy(null);
+                          setIsChatOpen(true);
+                          setChatInitialMessage(null);
+                        }}
+                      >
+                        Chat with Ace
+                      </Button>
+                      <Button 
+                        className="w-full bg-zinc-800 hover:bg-zinc-700 border-none text-xs" 
+                        icon={MessageSquare}
+                        onClick={() => {
+                          if (profile?.buddyType === 'AI' && friends.length === 0) {
+                            setToast({ title: 'No Buddy', message: 'Add a human buddy to use this feature.', type: 'info' });
+                          } else {
+                            setChatType('Buddy');
+                            // If we have friends, pick the first one as default if none selected
+                            if (friends.length > 0 && !selectedBuddy) {
+                              const otherId = friends[0].userIds.find((id: string) => id !== user?.uid);
+                              setSelectedBuddy(friendProfiles[otherId]);
+                            }
+                            setIsChatOpen(true);
+                          }
+                        }}
+                      >
+                        Chat with Buddy
+                      </Button>
+                    </div>
                   </div>
                   <Sparkles className="absolute -right-8 -bottom-8 text-white/5" size={160} />
                 </Card>
 
                 <div className="space-y-6">
-                  <h4 className="text-sm font-bold text-zinc-400 uppercase tracking-widest">Study Group</h4>
+                  <h4 className="text-sm font-bold text-zinc-400 uppercase tracking-widest">Study Buddies</h4>
                   <div className="space-y-3">
-                    <FriendCard name="Chidi" status="Focusing: Physics" online onInvite={handleInviteFriend} />
-                    <FriendCard name="Amaka" status="Offline" onInvite={handleInviteFriend} />
-                    <FriendCard name="Tunde" status="Focusing: Math" online onInvite={handleInviteFriend} />
+                    {friends.length === 0 ? (
+                      <p className="text-xs text-zinc-500 italic">No buddies yet. Invite some friends!</p>
+                    ) : (
+                      friends.map((f: any) => {
+                        const otherId = f.userIds.find((id: string) => id !== user.uid);
+                        const p = friendProfiles[otherId];
+                        return (
+                          <FriendCard 
+                            key={f.id}
+                            name={p?.displayName || 'Loading...'} 
+                            status="Online" 
+                            online 
+                            onInvite={() => {
+                              // Open chat with this buddy
+                              setChatType('Buddy');
+                              setSelectedBuddy(p);
+                              setIsChatOpen(true);
+                            }} 
+                          />
+                        );
+                      })
+                    )}
                   </div>
-                  <Button variant="secondary" className="w-full" icon={Plus} onClick={handleInviteFriend}>
-                    Invite Friend
+                  <Button variant="secondary" className="w-full" icon={Plus} onClick={() => setActiveTab('friends')}>
+                    Manage Friends
                   </Button>
                 </div>
               </div>
@@ -3175,7 +3381,7 @@ export default function App() {
             >
               <header>
                 <h2 className="text-2xl font-bold tracking-tight">Achievements</h2>
-                <p className="text-zinc-500">Your milestones and academic progress.</p>
+                <p className="text-text-secondary">Your milestones and academic progress.</p>
               </header>
 
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -3214,7 +3420,7 @@ export default function App() {
             >
               <header>
                 <h2 className="text-2xl font-bold tracking-tight">Settings</h2>
-                <p className="text-zinc-500">Manage your account and study preferences.</p>
+                <p className="text-text-secondary">Manage your account and study preferences.</p>
               </header>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -3431,7 +3637,7 @@ export default function App() {
                     </Card>
                   </section>
                   
-                  <Button variant="danger" className="w-full" onClick={handleLogout}>
+                  <Button variant="danger" className="w-full" onClick={() => setShowLogoutConfirm(true)}>
                     Sign Out of Account
                   </Button>
                 </div>
@@ -3441,7 +3647,9 @@ export default function App() {
         </AnimatePresence>
       </main>
 
-      {/* Modals */}
+      </div>
+
+      {/* Modals & Overlays */}
       <AnimatePresence>
         {activeQuiz && (
           <Quiz 
@@ -3458,6 +3666,7 @@ export default function App() {
           <ExamPractice 
             onCancel={() => setShowExamPractice(false)} 
             onComplete={handleQuizComplete}
+            setToast={setToast}
           />
         )}
         {showBuddyEdit && profile && (
@@ -3547,7 +3756,7 @@ export default function App() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-zinc-900 z-[100] flex flex-col items-center justify-center p-6 text-white"
+            className="fixed inset-0 bg-zinc-900 z-[150] flex flex-col items-center justify-center p-6 text-white"
           >
             <div className="absolute top-6 sm:top-10 left-6 sm:left-10 flex items-center gap-3">
               <Sparkles className="text-emerald-400 sm:w-6 sm:h-6" size={16} />
@@ -3613,6 +3822,8 @@ export default function App() {
               setChatInitialMessage(null);
             }} 
             initialMessage={chatInitialMessage || undefined}
+            isAI={chatType === 'AI'}
+            buddy={selectedBuddy}
           />
         )}
       </AnimatePresence>
@@ -3620,14 +3831,157 @@ export default function App() {
       {/* Change Password Modal */}
       <AnimatePresence>
         {showChangePasswordModal && (
-          <ChangePasswordModal onClose={() => setShowChangePasswordModal(false)} />
+          <ChangePasswordModal 
+            onClose={() => setShowChangePasswordModal(false)} 
+            onForgotPassword={() => {
+              setShowChangePasswordModal(false);
+              setShowForgotPasswordModal(true);
+            }}
+          />
+        )}
+        {showForgotPasswordModal && (
+          <ForgotPasswordModal 
+            onClose={() => setShowForgotPasswordModal(false)} 
+            initialEmail={user?.email || email} 
+          />
+        )}
+        {showLogoutConfirm && (
+          <LogoutConfirmModal 
+            onConfirm={handleLogout} 
+            onCancel={() => setShowLogoutConfirm(false)} 
+          />
         )}
       </AnimatePresence>
-    </div>
+    </>
   );
 }
 
-const ChangePasswordModal = ({ onClose }: { onClose: () => void }) => {
+const LogoutConfirmModal = ({ onConfirm, onCancel }: any) => (
+  <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[150] flex items-center justify-center p-4">
+    <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="max-w-sm w-full">
+      <Card className="p-8 text-center">
+        <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
+          <LogOut size={32} />
+        </div>
+        <h3 className="text-xl font-bold mb-2">Sign Out?</h3>
+        <p className="text-zinc-500 text-sm mb-8">Are you sure you want to sign out of your account?</p>
+        <div className="flex gap-3">
+          <Button variant="secondary" className="flex-1" onClick={onCancel}>Cancel</Button>
+          <Button variant="danger" className="flex-1" onClick={onConfirm}>Sign Out</Button>
+        </div>
+      </Card>
+    </motion.div>
+  </div>
+);
+
+const ForgotPasswordModal = ({ onClose, initialEmail = '' }: any) => {
+  const [email, setEmail] = useState(initialEmail);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+
+  const handleReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword !== confirmPassword) {
+      setError("Passwords do not match");
+      return;
+    }
+    if (newPassword.length < 6) {
+      setError("Password must be at least 6 characters");
+      return;
+    }
+    
+    setLoading(true);
+    setError(null);
+    try {
+      await sendPasswordResetEmail(auth, email);
+      setSuccess(true);
+    } catch (err: any) {
+      setError(err.message || "Failed to send reset email");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[150] flex items-center justify-center p-4">
+      <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="max-w-md w-full">
+        <Card className="p-8">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-xl font-bold">Reset Password</h2>
+            <button onClick={onClose} className="text-zinc-400 hover:text-zinc-600"><X size={20} /></button>
+          </div>
+
+          {success ? (
+            <div className="text-center py-8">
+              <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <CheckCircle size={32} />
+              </div>
+              <p className="font-bold text-emerald-700">Reset Email Sent!</p>
+              <p className="text-sm text-zinc-500 mb-6">We've sent a link to <b>{email}</b>. Follow the link to set your new password to what you entered.</p>
+              <Button variant="secondary" onClick={onClose} className="w-full">Close</Button>
+            </div>
+          ) : (
+            <form onSubmit={handleReset} className="space-y-4">
+              {error && (
+                <div className="p-3 bg-red-50 border border-red-100 rounded-xl text-red-600 text-xs font-medium">
+                  {error}
+                </div>
+              )}
+              
+              <div>
+                <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-2">Email Address</label>
+                <input 
+                  type="email" 
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="name@example.com"
+                  className="w-full p-3 rounded-xl border border-zinc-100 text-sm focus:outline-none focus:border-emerald-600"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-2">New Password</label>
+                <input 
+                  type="password" 
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full p-3 rounded-xl border border-zinc-100 text-sm focus:outline-none focus:border-emerald-600"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-2">Confirm New Password</label>
+                <input 
+                  type="password" 
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full p-3 rounded-xl border border-zinc-100 text-sm focus:outline-none focus:border-emerald-600"
+                  required
+                />
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <Button variant="secondary" className="flex-1" onClick={onClose} type="button">Cancel</Button>
+                <Button className="flex-1" type="submit" disabled={loading}>
+                  {loading ? 'Sending...' : 'Send Reset Link'}
+                </Button>
+              </div>
+            </form>
+          )}
+        </Card>
+      </motion.div>
+    </div>
+  );
+};
+
+const ChangePasswordModal = ({ onClose, onForgotPassword }: { onClose: () => void, onForgotPassword: () => void }) => {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [currentPassword, setCurrentPassword] = useState('');
@@ -3723,15 +4077,7 @@ const ChangePasswordModal = ({ onClose }: { onClose: () => void }) => {
                   <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Current Password</label>
                   <button 
                     type="button"
-                    onClick={async () => {
-                      if (!auth.currentUser?.email) return;
-                      try {
-                        await sendPasswordResetEmail(auth, auth.currentUser.email);
-                        setResetSent(true);
-                      } catch (err: any) {
-                        setError(err.message || "Failed to send reset email");
-                      }
-                    }}
+                    onClick={onForgotPassword}
                     className="text-[10px] font-bold text-emerald-600 hover:underline"
                   >
                     Forgot Password?
@@ -4041,11 +4387,11 @@ function Onboarding({ profile, onComplete, user }: any) {
         {step === 1 && (
           <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
             <h2 className="text-xl sm:text-2xl font-bold mb-2">Study Details</h2>
-            <p className="text-sm text-zinc-500 mb-8">Tell us about your current academic focus.</p>
+            <p className="text-sm text-zinc-600 mb-8">Tell us about your current academic focus.</p>
             
             <div className="space-y-6">
               <div>
-                <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-3">Your Name</label>
+                <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3">Your Name</label>
                 <input 
                   type="text"
                   value={data.displayName || user.displayName || user.email?.split('@')[0] || ''}
@@ -4056,7 +4402,7 @@ function Onboarding({ profile, onComplete, user }: any) {
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-3">Education Level</label>
+                <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3">Education Level</label>
                 <div className="grid grid-cols-2 gap-3">
                   <button 
                     onClick={() => setData({ ...data, educationLevel: 'Secondary' })}
@@ -4074,7 +4420,7 @@ function Onboarding({ profile, onComplete, user }: any) {
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-3">Target Exams</label>
+                <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3">Target Exams</label>
                 <div className="flex flex-wrap gap-2">
                   {['JAMB', 'WAEC', 'NECO', 'Post-UTME', 'Finals', 'SAT', 'IELTS'].map(exam => (
                     <button 
@@ -4114,7 +4460,7 @@ function Onboarding({ profile, onComplete, user }: any) {
                   </button>
                 ))}
               </div>
-              <p className="text-[10px] text-zinc-400 italic">You can add more subjects later in settings.</p>
+              <p className="text-[10px] text-zinc-500 italic">You can add more subjects later in settings.</p>
             </div>
           </motion.div>
         )}
@@ -4126,7 +4472,7 @@ function Onboarding({ profile, onComplete, user }: any) {
             
             <div className="space-y-6">
               <div>
-                <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-3">I'm good at...</label>
+                <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3">I'm good at...</label>
                 <input 
                   type="text" 
                   placeholder="e.g., Mathematics, Physics"
@@ -4135,7 +4481,7 @@ function Onboarding({ profile, onComplete, user }: any) {
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-3">I struggle with...</label>
+                <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3">I struggle with...</label>
                 <input 
                   type="text" 
                   placeholder="e.g., Chemistry, Biology"
@@ -4174,7 +4520,7 @@ function Onboarding({ profile, onComplete, user }: any) {
               {data.buddyType !== 'AI' && (
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-2">Buddy Name</label>
+                    <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Buddy Name</label>
                     <input 
                       type="text" 
                       placeholder="Enter name"
@@ -4185,7 +4531,7 @@ function Onboarding({ profile, onComplete, user }: any) {
                   
                   <div className="space-y-4 pt-2">
                     <div>
-                      <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-2">How much do you listen to them? (1-5)</label>
+                      <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">How much do you listen to them? (1-5)</label>
                       <div className="flex justify-between px-2">
                         {[1, 2, 3, 4, 5].map(num => (
                           <button 
@@ -4244,12 +4590,12 @@ function Onboarding({ profile, onComplete, user }: any) {
         {step === 5 && (
           <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
             <h2 className="text-xl sm:text-2xl font-bold mb-2">Study Schedule</h2>
-            <p className="text-sm text-zinc-500 mb-8">Set your daily study window and commitment.</p>
+            <p className="text-sm text-zinc-600 mb-8">Set your daily study window and commitment.</p>
             
             <div className="space-y-8">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-2">Start Time</label>
+                  <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Start Time</label>
                   <input 
                     type="time" 
                     value={data.studyStartTime}
@@ -4258,7 +4604,7 @@ function Onboarding({ profile, onComplete, user }: any) {
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-2">End Time</label>
+                  <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">End Time</label>
                   <input 
                     type="time" 
                     value={data.studyEndTime}
@@ -4269,9 +4615,9 @@ function Onboarding({ profile, onComplete, user }: any) {
               </div>
 
               <div className="text-center">
-                <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-2">Daily Hours</p>
+                <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Daily Hours</p>
                 <span className="text-5xl font-bold text-emerald-600">{data.availableHours}</span>
-                <span className="text-lg font-bold text-zinc-400 ml-2">hours</span>
+                <span className="text-lg font-bold text-zinc-500 ml-2">hours</span>
                 <input 
                   type="range" 
                   min="1" 
