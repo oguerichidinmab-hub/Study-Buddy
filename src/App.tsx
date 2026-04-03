@@ -1403,7 +1403,12 @@ const BuddyChatModal = ({ user, profile, onClose, initialMessage }: { user: User
                     <span className="text-[9px] text-zinc-400">
                       {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
-                    {isMe && <Check size={10} className="text-blue-400" />}
+                    {isMe && (
+                      <div className="flex -space-x-1">
+                        <Check size={10} className="text-blue-400" />
+                        <Check size={10} className="text-blue-400" />
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1456,7 +1461,7 @@ export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('welcome');
+  const [activeTab, setActiveTab] = useState('dashboard');
   const [tabHistory, setTabHistory] = useState<string[]>([]);
 
   const navigate = (tab: string) => {
