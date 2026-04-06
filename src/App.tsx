@@ -108,7 +108,7 @@ const Quiz = ({ subject, educationLevel, targetExams, cachedQuestions, onCacheQu
           setLoading(false);
         }
       };
-      fetchQuestions();
+      fetchQuestions().catch(err => console.error("fetchQuestions failed:", err));
     }
   }, [subject, educationLevel, targetExams, cachedQuestions, onCacheQuestions]);
 
@@ -1345,7 +1345,7 @@ const BuddyChatModal = ({ user, profile, onClose, initialMessage, isAI: propIsAI
       
       if (initialMessage) {
         setMessages([{ role: 'user', text: initialMessage, timestamp: Date.now(), senderId: user?.uid }]);
-        handleSend(initialMessage);
+        handleSend(initialMessage).catch(err => console.error("Initial handleSend failed:", err));
       } else {
         setMessages([{ role: 'model', text: `Hey ${profile.displayName}! I'm Ace, your study buddy. How's your studying going today?`, timestamp: Date.now() }]);
       }
@@ -1623,20 +1623,6 @@ export default function App() {
   }, [friendProfiles]);
   const [friendRequests, setFriendRequests] = useState<any[]>([]);
 
-  const handleResetPassword = async (customEmail?: string) => {
-    const emailToReset = customEmail || email;
-    if (!emailToReset) {
-      setToast({ title: 'Email Required', message: 'Please enter your email address to reset your password.', type: 'warning' });
-      return;
-    }
-    try {
-      await sendPasswordResetEmail(auth, emailToReset);
-      setToast({ title: 'Reset Email Sent', message: `A password reset link has been sent to ${emailToReset}. Check your inbox!`, type: 'success' });
-    } catch (error: any) {
-      console.error('Password reset error:', error);
-      setToast({ title: 'Reset Failed', message: error.message || 'Failed to send reset email.', type: 'error' });
-    }
-  };
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showForgotPasswordModal, setShowForgotPasswordModal] = useState(false);
@@ -1649,33 +1635,38 @@ export default function App() {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
-      console.log('Auth State Changed:', u?.uid);
-      setUser(u);
-      setIsAuthReady(true);
-      if (u) {
-        try {
-          console.log('Fetching profile for:', u.uid);
-          const profileDoc = await getDoc(doc(db, 'users', u.uid));
-          if (profileDoc.exists()) {
-            console.log('Profile found');
-            setProfile(profileDoc.data() as UserProfile);
-            setShowOnboarding(false);
-          } else {
-            console.log('No profile found, showing onboarding');
-            setShowOnboarding(true);
-          }
-        } catch (error) {
-          console.error('Error fetching profile:', error);
+      try {
+        console.log('Auth State Changed:', u?.uid);
+        setUser(u);
+        setIsAuthReady(true);
+        if (u) {
           try {
-            handleFirestoreError(error, OperationType.GET, `users/${u.uid}`);
-          } catch (e) {}
+            console.log('Fetching profile for:', u.uid);
+            const profileDoc = await getDoc(doc(db, 'users', u.uid));
+            if (profileDoc.exists()) {
+              console.log('Profile found');
+              setProfile(profileDoc.data() as UserProfile);
+              setShowOnboarding(false);
+            } else {
+              console.log('No profile found, showing onboarding');
+              setShowOnboarding(true);
+            }
+          } catch (error) {
+            console.error('Error fetching profile:', error);
+            try {
+              handleFirestoreError(error, OperationType.GET, `users/${u.uid}`);
+            } catch (e) {}
+          }
+        } else {
+          console.log('User logged out');
+          setProfile(null);
+          setShowOnboarding(false);
         }
-      } else {
-        console.log('User logged out');
-        setProfile(null);
-        setShowOnboarding(false);
+        setLoading(false);
+      } catch (error) {
+        console.error('onAuthStateChanged callback error:', error);
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     // Safety timeout: if auth doesn't respond in 10s, stop loading
@@ -1751,26 +1742,30 @@ export default function App() {
     const q = query(collection(db, 'friends'), where('userIds', 'array-contains', user.uid));
     
     const unsubscribe = onSnapshot(q, async (snapshot) => {
-      const friendsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setFriends(friendsData);
+      try {
+        const friendsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setFriends(friendsData);
 
-      // Fetch profiles for friends
-      const otherUserIds = friendsData.map((f: any) => f.userIds.find((id: string) => id !== user.uid));
-      const uniqueIds = Array.from(new Set(otherUserIds)).filter(id => !!id && !friendProfilesRef.current[id]);
+        // Fetch profiles for friends
+        const otherUserIds = friendsData.map((f: any) => f.userIds.find((id: string) => id !== user.uid));
+        const uniqueIds = Array.from(new Set(otherUserIds)).filter(id => !!id && !friendProfilesRef.current[id]);
 
-      if (uniqueIds.length > 0) {
-        const newProfiles: { [key: string]: UserProfile } = { ...friendProfilesRef.current };
-        for (const id of uniqueIds) {
-          try {
-            const pDoc = await getDoc(doc(db, 'users', id as string));
-            if (pDoc.exists()) {
-              newProfiles[id as string] = pDoc.data() as UserProfile;
+        if (uniqueIds.length > 0) {
+          const newProfiles: { [key: string]: UserProfile } = { ...friendProfilesRef.current };
+          for (const id of uniqueIds) {
+            try {
+              const pDoc = await getDoc(doc(db, 'users', id as string));
+              if (pDoc.exists()) {
+                newProfiles[id as string] = pDoc.data() as UserProfile;
+              }
+            } catch (err) {
+              console.error('Error fetching friend profile:', err);
             }
-          } catch (err) {
-            console.error('Error fetching friend profile:', err);
           }
+          setFriendProfiles(newProfiles);
         }
-        setFriendProfiles(newProfiles);
+      } catch (error) {
+        console.error('onSnapshot friends callback error:', error);
       }
     }, (error) => {
       try {
@@ -1878,7 +1873,7 @@ export default function App() {
 
   useEffect(() => {
     if (profile && !buddyMessage) {
-      fetchBuddyMessage('motivation');
+      fetchBuddyMessage('motivation').catch(err => console.error("fetchBuddyMessage failed:", err));
     }
   }, [profile, buddyMessage, fetchBuddyMessage]);
 
@@ -1892,7 +1887,7 @@ export default function App() {
       setIsTimerRunning(false);
       // Handle session completion
       if (activeSession) {
-        completeSession();
+        completeSession().catch(err => console.error("completeSession failed:", err));
       }
     }
     return () => clearInterval(interval);
@@ -2063,15 +2058,15 @@ export default function App() {
   }, [activeTab, accessibilitySettings.voiceAssistance]);
 
   useEffect(() => {
-    if (accessibilitySettings.voiceAssistance && buddyMessage && !isBuddyLoading) {
-      const utterance = new SpeechSynthesisUtterance(`Ace says: ${buddyMessage}`);
+    if (accessibilitySettings.voiceAssistance && buddyMessage.message && !isBuddyLoading) {
+      const utterance = new SpeechSynthesisUtterance(`Ace says: ${buddyMessage.message}`);
       window.speechSynthesis.speak(utterance);
     }
   }, [buddyMessage, isBuddyLoading, accessibilitySettings.voiceAssistance]);
 
   const handleReadBuddyMessage = () => {
-    if (!buddyMessage) return;
-    const utterance = new SpeechSynthesisUtterance(buddyMessage);
+    if (!buddyMessage.message) return;
+    const utterance = new SpeechSynthesisUtterance(buddyMessage.message);
     window.speechSynthesis.speak(utterance);
   };
 
@@ -2280,7 +2275,7 @@ export default function App() {
       setToast({ title: 'Quiz Saved', message: `You scored ${score}/${total} in ${quizSubject}!`, type: 'success' });
       
       // Smart Integration: Adjust timetable based on performance
-      adjustTimetableBasedOnPerformance(quizSubject, score, total);
+      await adjustTimetableBasedOnPerformance(quizSubject, score, total);
 
       // Clear cache for this subject to get fresh questions next time if desired
       setQuizCache(prev => {
@@ -2315,7 +2310,7 @@ export default function App() {
 
       if (adjustmentMessage) {
         setToast({ title: 'Ace Recommendation', message: adjustmentMessage, type: 'info' });
-        handleGenerateSchedule();
+        await handleGenerateSchedule();
       }
     } catch (error) {
       console.error('Failed to adjust timetable:', error);
@@ -2739,7 +2734,7 @@ export default function App() {
                             <RefreshCw size={14} className="animate-spin" /> Ace is thinking...
                           </span>
                         ) : (
-                          `"${buddyMessage}"`
+                          `"${buddyMessage.message}"`
                         )}
                       </p>
                     </div>
