@@ -1693,16 +1693,6 @@ export default function App() {
     };
   }, []);
 
-  const handleLogin = async () => {
-    setAuthError(null);
-    try {
-      await signInWithPopup(auth, googleProvider);
-    } catch (error: any) {
-      console.error('Login failed:', error);
-      setAuthError(error.message);
-    }
-  };
-
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError(null);
@@ -1713,6 +1703,7 @@ export default function App() {
       } else {
         await signInWithEmailAndPassword(auth, email, password);
       }
+      setLoading(false);
     } catch (error: any) {
       console.error('Email auth failed:', error);
       setAuthError(error.message);
@@ -2421,7 +2412,7 @@ export default function App() {
             <h2 className="text-xl font-bold mb-4">{isSignUp ? 'Create Account' : 'Welcome Back'}</h2>
             <form onSubmit={handleEmailAuth} className="space-y-4">
               <div>
-                <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-2">Email Address</label>
+                <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Email Address</label>
                 <input 
                   type="email" 
                   value={email}
@@ -2433,14 +2424,14 @@ export default function App() {
               </div>
               <div>
                 <div className="flex justify-between items-center mb-2">
-                  <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Password</label>
+                  <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Password</label>
                   {!isSignUp && (
                     <button 
                       type="button"
                       onClick={() => setShowForgotPasswordModal(true)}
                       className="text-[10px] font-bold text-emerald-600 hover:underline"
                     >
-                      Forgot Password?
+                      Forgot?
                     </button>
                   )}
                 </div>
@@ -2460,17 +2451,6 @@ export default function App() {
                 {loading ? 'Processing...' : (isSignUp ? 'Sign Up' : 'Sign In')}
               </Button>
             </form>
-            
-            <div className="mt-6 flex flex-col gap-3">
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-zinc-100"></span></div>
-                <div className="relative flex justify-center text-xs uppercase"><span className="bg-white px-2 text-zinc-400">Or continue with</span></div>
-              </div>
-              
-              <Button variant="secondary" onClick={handleLogin} className="w-full py-3" icon={Zap}>
-                Google Account
-              </Button>
-            </div>
           </Card>
 
           <button 
@@ -3876,20 +3856,14 @@ const LogoutConfirmModal = ({ onConfirm, onCancel }: any) => (
 
 const ForgotPasswordModal = ({ onClose, initialEmail = '' }: any) => {
   const [email, setEmail] = useState(initialEmail);
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
   const handleReset = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (newPassword !== confirmPassword) {
-      setError("Passwords do not match");
-      return;
-    }
-    if (newPassword.length < 6) {
-      setError("Password must be at least 6 characters");
+    if (!email) {
+      setError("Email is required");
       return;
     }
     
@@ -3899,7 +3873,12 @@ const ForgotPasswordModal = ({ onClose, initialEmail = '' }: any) => {
       await sendPasswordResetEmail(auth, email);
       setSuccess(true);
     } catch (err: any) {
-      setError(err.message || "Failed to send reset email");
+      console.error('Password reset error:', err);
+      if (err.code === 'auth/user-not-found') {
+        setError("No account found with this email address.");
+      } else {
+        setError(err.message || "Failed to send reset email");
+      }
     } finally {
       setLoading(false);
     }
@@ -3920,11 +3899,12 @@ const ForgotPasswordModal = ({ onClose, initialEmail = '' }: any) => {
                 <CheckCircle size={32} />
               </div>
               <p className="font-bold text-emerald-700">Reset Email Sent!</p>
-              <p className="text-sm text-zinc-500 mb-6">We've sent a link to <b>{email}</b>. Follow the link to set your new password to what you entered.</p>
-              <Button variant="secondary" onClick={onClose} className="w-full">Close</Button>
+              <p className="text-sm text-zinc-600 mb-6">We've sent a secure link to <b>{email}</b>. Follow the link to reset your password.</p>
+              <Button variant="secondary" onClick={onClose} className="w-full">Back to Sign In</Button>
             </div>
           ) : (
             <form onSubmit={handleReset} className="space-y-4">
+              <p className="text-sm text-zinc-600 mb-4">Enter your email address and we'll send you a secure link to reset your password.</p>
               {error && (
                 <div className="p-3 bg-red-50 border border-red-100 rounded-xl text-red-600 text-xs font-medium">
                   {error}
@@ -3932,7 +3912,7 @@ const ForgotPasswordModal = ({ onClose, initialEmail = '' }: any) => {
               )}
               
               <div>
-                <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-2">Email Address</label>
+                <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Email Address</label>
                 <input 
                   type="email" 
                   value={email}
@@ -3943,36 +3923,17 @@ const ForgotPasswordModal = ({ onClose, initialEmail = '' }: any) => {
                 />
               </div>
 
-              <div>
-                <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-2">New Password</label>
-                <input 
-                  type="password" 
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full p-3 rounded-xl border border-zinc-100 text-sm focus:outline-none focus:border-emerald-600"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-2">Confirm New Password</label>
-                <input 
-                  type="password" 
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full p-3 rounded-xl border border-zinc-100 text-sm focus:outline-none focus:border-emerald-600"
-                  required
-                />
-              </div>
-
-              <div className="flex gap-3 pt-4">
-                <Button variant="secondary" className="flex-1" onClick={onClose} type="button">Cancel</Button>
-                <Button className="flex-1" type="submit" disabled={loading}>
-                  {loading ? 'Sending...' : 'Send Reset Link'}
-                </Button>
-              </div>
+              <Button type="submit" className="w-full py-3" disabled={loading}>
+                {loading ? 'Sending...' : 'Send Reset Link'}
+              </Button>
+              
+              <button 
+                type="button"
+                onClick={onClose}
+                className="w-full text-sm text-zinc-500 font-medium hover:text-emerald-600 transition-colors"
+              >
+                Back to Sign In
+              </button>
             </form>
           )}
         </Card>
