@@ -15,7 +15,7 @@ import {
 import { 
   BookOpen, Calendar, CheckCircle, Clock, LayoutDashboard, LogOut, 
   MessageSquare, Play, Plus, Settings as SettingsIcon, User as UserIcon, Zap, 
-  Award, Brain, Coffee, Moon, Sun, Target, TrendingUp, X, Lightbulb,
+  Award, Brain, Coffee, Moon, Sun, Target, TrendingUp, X, Lightbulb, GraduationCap,
   ChevronRight, ArrowLeft, RefreshCw, Sparkles, Volume2, Accessibility, Users, Info, Timer, AlertTriangle, ExternalLink,
   Bell, Check, Lock
 } from 'lucide-react';
@@ -24,11 +24,47 @@ import { io, Socket } from "socket.io-client";
 
 // Initialize socket
 const socket: Socket = io();
+socket.on("connect_error", (err) => {
+  console.error("Socket connection error:", err);
+});
 import { UserProfile, Schedule, ScheduleBlock, StudySession, QuizResult, ExamQuestion } from './types';
 import { generateTimetable, getBuddyMessage, generateQuiz, createBuddyChat } from './services/geminiService';
 import { PRACTICE_QUESTIONS } from './data/practiceQuestions';
 
 // --- Components ---
+
+const SplashScreen = () => (
+  <motion.div 
+    initial={{ opacity: 1 }}
+    exit={{ opacity: 0 }}
+    className="fixed inset-0 max-w-md mx-auto bg-[#10B981] z-[300] flex flex-col items-center justify-center text-white"
+  >
+    <motion.div
+      initial={{ scale: 0.8, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      transition={{ duration: 0.5 }}
+      className="flex flex-col items-center"
+    >
+      <div className="w-24 h-24 bg-white/20 rounded-3xl flex items-center justify-center mb-6 backdrop-blur-md">
+        <GraduationCap size={48} className="text-white" />
+      </div>
+      <h1 className="text-4xl font-black tracking-tighter mb-2">Study Buddy</h1>
+      <p className="text-white/60 font-medium uppercase tracking-widest text-xs">Your AI Academic Companion</p>
+    </motion.div>
+    <div className="absolute bottom-12">
+      <div className="flex gap-1">
+        {[0, 1, 2].map(i => (
+          <motion.div
+            key={i}
+            animate={{ opacity: [0.3, 1, 0.3] }}
+            transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }}
+            className="w-2 h-2 bg-white rounded-full"
+          />
+        ))}
+      </div>
+    </div>
+  </motion.div>
+);
 
 const Button = ({ children, onClick, variant = 'primary', className = '', disabled = false, icon: Icon }: any) => {
   const variants: any = {
@@ -146,7 +182,7 @@ const Quiz = ({ subject, educationLevel, targetExams, cachedQuestions, onCacheQu
 
   if (loading) {
     return (
-      <div className="fixed inset-0 bg-bg-dark/80 backdrop-blur-sm z-[120] flex items-center justify-center">
+      <div className="fixed inset-0 max-w-md mx-auto bg-bg-dark/80 backdrop-blur-sm z-[120] flex items-center justify-center">
         <Card className="p-8 text-center space-y-4">
           <RefreshCw className="animate-spin text-brand-primary mx-auto" size={48} />
           <h3 className="text-xl font-bold">Generating Quiz...</h3>
@@ -158,7 +194,7 @@ const Quiz = ({ subject, educationLevel, targetExams, cachedQuestions, onCacheQu
 
   if (finished) {
     return (
-      <div className="fixed inset-0 bg-bg-dark/80 backdrop-blur-sm z-[120] flex items-center justify-center p-6">
+      <div className="fixed inset-0 max-w-md mx-auto bg-bg-dark/80 backdrop-blur-sm z-[120] flex items-center justify-center p-6">
         <Card className="max-w-md w-full p-8 text-center space-y-6">
           <div className="w-20 h-20 bg-brand-primary/20 text-brand-primary rounded-full flex items-center justify-center mx-auto">
             <Award size={48} />
@@ -179,7 +215,7 @@ const Quiz = ({ subject, educationLevel, targetExams, cachedQuestions, onCacheQu
   const currentQ = questions[currentIdx];
 
   return (
-    <div className="fixed inset-0 bg-bg-dark/80 backdrop-blur-sm z-[120] flex items-center justify-center p-6">
+    <div className="fixed inset-0 max-w-md mx-auto bg-bg-dark/80 backdrop-blur-sm z-[120] flex items-center justify-center p-6">
       <Card className="max-w-2xl w-full p-8 space-y-8">
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-3">
@@ -209,7 +245,7 @@ const Quiz = ({ subject, educationLevel, targetExams, cachedQuestions, onCacheQu
   );
 };
 
-const Friends = ({ user, friends, friendProfiles, onAddFriend }: any) => {
+const Friends = ({ user, friends, friendProfiles, onAddFriend, onChat }: any) => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [friendEmail, setFriendEmail] = useState('');
 
@@ -254,7 +290,10 @@ const Friends = ({ user, friends, friendProfiles, onAddFriend }: any) => {
                 <h3 className="font-bold">{friend.name}</h3>
                 <p className="text-xs text-text-secondary capitalize">{friend.status}</p>
               </div>
-              <button className="p-2 text-text-secondary hover:text-brand-primary transition-colors">
+              <button 
+                onClick={() => onChat(friend)}
+                className="p-2 text-text-secondary hover:text-brand-primary transition-colors"
+              >
                 <MessageSquare size={20} />
               </button>
             </Card>
@@ -265,7 +304,7 @@ const Friends = ({ user, friends, friendProfiles, onAddFriend }: any) => {
       <Button className="w-full mt-8" icon={Plus} onClick={() => setShowAddModal(true)}>Add New Friend</Button>
 
       {showAddModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-6">
+        <div className="fixed inset-0 max-w-md mx-auto bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-6">
           <Card className="max-w-md w-full p-8 space-y-6">
             <div className="flex justify-between items-center">
               <h3 className="text-2xl font-bold">Add Study Buddy</h3>
@@ -564,7 +603,7 @@ const StudyTips = ({ onAction }: any) => {
             </div>
             <div className="flex-1">
               <h3 className="font-bold">{tip.title}</h3>
-              <p className="text-xs text-text-secondary">{tip.desc}</p>
+              <p className="text-xs text-zinc-600">{tip.desc}</p>
             </div>
           </Card>
         ))}
@@ -937,7 +976,7 @@ const EditBuddyModal = ({ profile, onSave, onCancel }: any) => {
   const [isCustomName, setIsCustomName] = useState(profile.buddyType === 'AI' && profile.buddyName !== 'Ace' && !!profile.buddyName);
 
   return (
-    <div className="fixed inset-0 bg-zinc-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+    <div className="fixed inset-0 max-w-md mx-auto bg-zinc-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
       <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl">
         <div className="flex justify-between items-center mb-6">
           <h3 className="text-xl font-bold">Edit Buddy</h3>
@@ -1128,7 +1167,7 @@ const ExamPractice = ({ onCancel, onComplete, setToast }: { onCancel: () => void
     const hasAnswered = userAnswers[currentIdx] !== null;
 
     return (
-      <div className="fixed inset-0 bg-zinc-50 z-[110] flex flex-col p-6 overflow-y-auto">
+      <div className="fixed inset-0 max-w-md mx-auto bg-zinc-50 z-[110] flex flex-col p-6 overflow-y-auto">
         <div className="flex justify-between items-center mb-8">
           <div>
             <Badge color="violet">{q.examType} Practice</Badge>
@@ -1180,7 +1219,7 @@ const ExamPractice = ({ onCancel, onComplete, setToast }: { onCancel: () => void
           )}
         </div>
 
-        <div className="fixed bottom-0 left-0 right-0 p-6 bg-white border-t border-zinc-100 flex gap-3">
+        <div className="fixed bottom-0 max-w-md mx-auto w-full p-6 bg-white border-t border-zinc-100 flex gap-3">
           <Button variant="secondary" className="flex-1" onClick={prevQuestion} disabled={currentIdx === 0} icon={ArrowLeft}>Back</Button>
           <Button className="flex-1" onClick={nextQuestion} icon={ChevronRight}>
             {currentIdx === questions.length - 1 ? 'Finish' : 'Next'}
@@ -1192,7 +1231,7 @@ const ExamPractice = ({ onCancel, onComplete, setToast }: { onCancel: () => void
 
   if (finished) {
     return (
-      <div className="fixed inset-0 bg-white z-[110] flex flex-col items-center justify-center p-6 text-center">
+      <div className="fixed inset-0 max-w-md mx-auto bg-white z-[110] flex flex-col items-center justify-center p-6 text-center">
         <div className="w-20 h-20 bg-emerald-100 rounded-3xl flex items-center justify-center text-emerald-600 mb-6">
           <Award size={40} />
         </div>
@@ -1207,7 +1246,7 @@ const ExamPractice = ({ onCancel, onComplete, setToast }: { onCancel: () => void
   }
 
   return (
-    <div className="fixed inset-0 bg-white z-[110] flex flex-col p-6 overflow-y-auto">
+    <div className="fixed inset-0 max-w-md mx-auto bg-white z-[110] flex flex-col p-6 overflow-y-auto">
       <div className="flex justify-between items-center mb-8">
         <div className="flex items-center gap-3">
           {(selectedExamType || selectedSubject) && (
@@ -1307,7 +1346,7 @@ const BuddyChatModal = ({ user, profile, onClose, initialMessage, isAI: propIsAI
   const chatRef = useRef<any>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const isAI = propIsAI !== undefined ? propIsAI : profile.buddyType === 'AI';
-  const buddyName = isAI ? 'Ace' : (buddy?.displayName || profile.buddyName || 'Buddy');
+  const buddyName = isAI ? 'Ace (AI)' : (buddy?.displayName || profile.buddyName || 'Study Buddy');
   const buddyId = isAI ? 'ai' : (buddy?.uid || profile.buddyId);
   
   // Stable room ID for user-to-user chat
@@ -1316,6 +1355,7 @@ const BuddyChatModal = ({ user, profile, onClose, initialMessage, isAI: propIsAI
     : `chat-user-${[user?.uid, buddyId].sort().join('-')}`;
 
   useEffect(() => {
+    console.log("BuddyChatModal mounted", { isAI, buddyName, roomId, userId: user?.uid });
     if (!user) return;
     
     // Join socket room for real-time chat
@@ -1367,7 +1407,10 @@ const BuddyChatModal = ({ user, profile, onClose, initialMessage, isAI: propIsAI
 
   const handleSend = async (customMsg?: string) => {
     const msgToSend = customMsg || input.trim();
-    if (!msgToSend || loading || !user) return;
+    if (!msgToSend || loading || !user) {
+      console.log("handleSend blocked:", { msgToSend, loading, user: !!user });
+      return;
+    }
 
     const timestamp = Date.now();
 
@@ -1377,12 +1420,16 @@ const BuddyChatModal = ({ user, profile, onClose, initialMessage, isAI: propIsAI
     }
 
     // Send via socket for real-time
-    socket.emit("send-message", {
-      roomId,
-      senderId: user.uid,
-      text: msgToSend,
-      timestamp
-    });
+    try {
+      socket.emit("send-message", {
+        roomId,
+        senderId: user.uid,
+        text: msgToSend,
+        timestamp
+      });
+    } catch (e) {
+      console.error("Socket emit error:", e);
+    }
     
     if (isAI && chatRef.current) {
       setLoading(true);
@@ -1415,7 +1462,7 @@ const BuddyChatModal = ({ user, profile, onClose, initialMessage, isAI: propIsAI
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div className="fixed inset-0 max-w-md mx-auto bg-black/60 backdrop-blur-sm z-[200] flex items-end sm:items-center justify-center p-0 sm:p-4">
       <motion.div 
         initial={{ y: '100%' }} 
         animate={{ y: 0 }} 
@@ -1626,47 +1673,66 @@ export default function App() {
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showForgotPasswordModal, setShowForgotPasswordModal] = useState(false);
+  const [showSplash, setShowSplash] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setShowSplash(false), 2500);
+    return () => clearTimeout(timer);
+  }, []);
 
   // --- Auth & Profile ---
+
+  useEffect(() => {
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      console.error('Unhandled Promise Rejection:', event.reason);
+      // Optionally show a toast or error boundary
+    };
+
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+    return () => window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+  }, []);
 
   useEffect(() => {
     console.log('App State:', { user: user?.uid, profile: !!profile, showOnboarding, loading, isAuthReady });
   }, [user, profile, showOnboarding, loading, isAuthReady]);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (u) => {
-      try {
-        console.log('Auth State Changed:', u?.uid);
-        setUser(u);
-        setIsAuthReady(true);
-        if (u) {
-          try {
-            console.log('Fetching profile for:', u.uid);
-            const profileDoc = await getDoc(doc(db, 'users', u.uid));
-            if (profileDoc.exists()) {
-              console.log('Profile found');
-              setProfile(profileDoc.data() as UserProfile);
-              setShowOnboarding(false);
-            } else {
-              console.log('No profile found, showing onboarding');
-              setShowOnboarding(true);
-            }
-          } catch (error) {
-            console.error('Error fetching profile:', error);
+    const unsubscribe = onAuthStateChanged(auth, (u) => {
+      const handleAuthChange = async () => {
+        try {
+          console.log('Auth State Changed:', u?.uid);
+          setUser(u);
+          setIsAuthReady(true);
+          if (u) {
             try {
-              handleFirestoreError(error, OperationType.GET, `users/${u.uid}`);
-            } catch (e) {}
+              console.log('Fetching profile for:', u.uid);
+              const profileDoc = await getDoc(doc(db, 'users', u.uid));
+              if (profileDoc.exists()) {
+                console.log('Profile found');
+                setProfile(profileDoc.data() as UserProfile);
+                setShowOnboarding(false);
+              } else {
+                console.log('No profile found, showing onboarding');
+                setShowOnboarding(true);
+              }
+            } catch (error) {
+              console.error('Error fetching profile:', error);
+              try {
+                handleFirestoreError(error, OperationType.GET, `users/${u.uid}`);
+              } catch (e) {}
+            }
+          } else {
+            console.log('User logged out');
+            setProfile(null);
+            setShowOnboarding(false);
           }
-        } else {
-          console.log('User logged out');
-          setProfile(null);
-          setShowOnboarding(false);
+          setLoading(false);
+        } catch (error) {
+          console.error('onAuthStateChanged callback error:', error);
+          setLoading(false);
         }
-        setLoading(false);
-      } catch (error) {
-        console.error('onAuthStateChanged callback error:', error);
-        setLoading(false);
-      }
+      };
+      handleAuthChange().catch(err => console.error("handleAuthChange failed:", err));
     });
 
     // Safety timeout: if auth doesn't respond in 10s, stop loading
@@ -1741,32 +1807,35 @@ export default function App() {
 
     const q = query(collection(db, 'friends'), where('userIds', 'array-contains', user.uid));
     
-    const unsubscribe = onSnapshot(q, async (snapshot) => {
-      try {
-        const friendsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setFriends(friendsData);
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const processSnapshot = async () => {
+        try {
+          const friendsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          setFriends(friendsData);
 
-        // Fetch profiles for friends
-        const otherUserIds = friendsData.map((f: any) => f.userIds.find((id: string) => id !== user.uid));
-        const uniqueIds = Array.from(new Set(otherUserIds)).filter(id => !!id && !friendProfilesRef.current[id]);
+          // Fetch profiles for friends
+          const otherUserIds = friendsData.map((f: any) => f.userIds.find((id: string) => id !== user.uid));
+          const uniqueIds = Array.from(new Set(otherUserIds)).filter(id => !!id && !friendProfilesRef.current[id]);
 
-        if (uniqueIds.length > 0) {
-          const newProfiles: { [key: string]: UserProfile } = { ...friendProfilesRef.current };
-          for (const id of uniqueIds) {
-            try {
-              const pDoc = await getDoc(doc(db, 'users', id as string));
-              if (pDoc.exists()) {
-                newProfiles[id as string] = pDoc.data() as UserProfile;
+          if (uniqueIds.length > 0) {
+            const newProfiles: { [key: string]: UserProfile } = { ...friendProfilesRef.current };
+            for (const id of uniqueIds) {
+              try {
+                const pDoc = await getDoc(doc(db, 'users', id as string));
+                if (pDoc.exists()) {
+                  newProfiles[id as string] = pDoc.data() as UserProfile;
+                }
+              } catch (err) {
+                console.error('Error fetching friend profile:', err);
               }
-            } catch (err) {
-              console.error('Error fetching friend profile:', err);
             }
+            setFriendProfiles(newProfiles);
           }
-          setFriendProfiles(newProfiles);
+        } catch (error) {
+          console.error('onSnapshot friends callback error:', error);
         }
-      } catch (error) {
-        console.error('onSnapshot friends callback error:', error);
-      }
+      };
+      processSnapshot().catch(err => console.error("processSnapshot failed:", err));
     }, (error) => {
       try {
         handleFirestoreError(error, OperationType.LIST, 'friends');
@@ -2368,7 +2437,7 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-zinc-50 p-6">
+      <div className="max-w-md mx-auto min-h-screen flex flex-col items-center justify-center bg-zinc-50 p-6 relative shadow-2xl border-x border-zinc-200 overflow-x-hidden">
         <motion.div 
           animate={{ rotate: 360 }}
           transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
@@ -2389,14 +2458,14 @@ export default function App() {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-zinc-50 flex flex-col items-center justify-center p-6 text-center">
+      <div className="max-w-md mx-auto min-h-screen bg-zinc-50 flex flex-col items-center justify-center p-6 text-center relative shadow-2xl border-x border-zinc-200 overflow-x-hidden">
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="max-w-md w-full"
         >
           <div className="w-20 h-20 bg-emerald-600 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-xl shadow-emerald-200">
-            <Sparkles className="text-white" size={40} />
+            <GraduationCap className="text-white" size={40} />
           </div>
           <h1 className="text-4xl font-bold text-zinc-900 mb-4 tracking-tight">Study Buddy</h1>
           <p className="text-zinc-600 mb-10 text-lg">
@@ -2471,9 +2540,12 @@ export default function App() {
 
   return (
     <>
-      <div className={`min-h-screen bg-zinc-50 pb-24 lg:pb-0 lg:pl-64 pt-20 ${accessibilitySettings.highContrast ? 'contrast-125' : ''} ${accessibilitySettings.largeText ? 'text-lg' : ''}`}>
+      <AnimatePresence>
+        {showSplash && <SplashScreen />}
+      </AnimatePresence>
+      <div className={`max-w-md mx-auto min-h-screen bg-zinc-50 pb-24 pt-20 relative shadow-2xl border-x border-zinc-200 overflow-x-hidden ${accessibilitySettings.highContrast ? 'contrast-125' : ''} ${accessibilitySettings.largeText ? 'text-lg' : ''}`}>
       {/* Top Bar / Quick Menu */}
-      <header className="fixed top-0 left-0 right-0 h-16 bg-white/90 backdrop-blur-md border-b border-zinc-100 z-40 lg:left-64 flex items-center justify-between px-6 shadow-sm">
+      <header className="fixed top-0 w-full max-w-md h-16 bg-white/90 backdrop-blur-md border-b border-zinc-100 z-40 flex items-center justify-between px-6 shadow-sm">
         <div className="flex items-center gap-3">
           {(activeTab !== 'dashboard' && (tabHistory.length > 0 || activeQuiz || showExamPractice || showBuddyEdit || showAbout || showChangePasswordModal || isChatOpen || isFocusMode)) && (
             <button 
@@ -2484,12 +2556,11 @@ export default function App() {
               <ArrowLeft size={20} />
             </button>
           )}
-          <div className="flex items-center gap-2 lg:hidden">
-            <Sparkles className="text-emerald-600" size={20} />
+          <div className="flex items-center gap-2">
+            <GraduationCap className="text-emerald-600" size={20} />
             <span className="font-bold text-lg">Study Buddy</span>
           </div>
         </div>
-        <div className="hidden lg:block" />
         <div className="flex items-center gap-2">
           <button 
             onClick={() => navigate('notifications')}
@@ -2537,37 +2608,13 @@ export default function App() {
         </div>
       </header>
 
-      {/* Sidebar (Desktop) / Bottom Nav (Mobile) */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-zinc-100 px-4 py-2 pb-[env(safe-area-inset-bottom,12px)] flex justify-around items-center z-50 lg:top-0 lg:bottom-0 lg:left-0 lg:w-64 lg:flex-col lg:border-r lg:border-t-0 lg:py-10 lg:px-6 shadow-[0_-4px_20px_rgba(0,0,0,0.03)]">
-        <div className="hidden lg:flex items-center gap-3 mb-12 px-4">
-          <div className="w-10 h-10 bg-emerald-600 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-100">
-            <Sparkles className="text-white" size={20} />
-          </div>
-          <span className="font-bold text-xl tracking-tight">Study Buddy</span>
-        </div>
-
-        <div className="flex lg:flex-col gap-1 w-full">
+      {/* Bottom Nav (Mobile Form) */}
+      <nav className="fixed bottom-0 w-full max-w-md bg-white/95 backdrop-blur-md border-t border-zinc-100 px-4 py-2 pb-[env(safe-area-inset-bottom,12px)] flex justify-around items-center z-50 shadow-[0_-4px_20px_rgba(0,0,0,0.03)]">
+        <div className="flex gap-1 w-full">
           <NavButton active={activeTab === 'dashboard'} onClick={() => navigate('dashboard')} icon={LayoutDashboard} label="Home" />
           <NavButton active={activeTab === 'practice'} onClick={() => navigate('practice')} icon={BookOpen} label="Practice" />
           <NavButton active={activeTab === 'buddy'} onClick={() => navigate('buddy')} icon={MessageSquare} label="Buddy" />
           <NavButton active={activeTab === 'settings'} onClick={() => navigate('settings')} icon={SettingsIcon} label="Settings" />
-        </div>
-
-        <div className="hidden lg:flex flex-col gap-4 w-full mt-auto px-4">
-          <div className="p-4 bg-zinc-50 rounded-2xl border border-zinc-100">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold text-xs">
-                {(profile?.displayName || user?.displayName)?.[0] || 'S'}
-              </div>
-              <div className="overflow-hidden">
-                <p className="text-sm font-bold truncate">{profile?.displayName || user?.displayName || user?.email?.split('@')[0] || 'Student'}</p>
-                <p className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider">Free Plan</p>
-              </div>
-            </div>
-            <button onClick={() => setShowLogoutConfirm(true)} className="text-xs text-red-500 font-bold flex items-center gap-2 hover:text-red-600 transition-colors">
-              <LogOut size={14} /> Sign Out
-            </button>
-          </div>
         </div>
       </nav>
 
@@ -2596,7 +2643,7 @@ export default function App() {
         )}
       </AnimatePresence>
       {/* Main Content */}
-      <main className="p-6 max-w-5xl mx-auto">
+      <main className="p-6 w-full">
         <AnimatePresence mode="wait">
           {activeTab === 'dashboard' && (
             <motion.div 
@@ -2827,7 +2874,7 @@ export default function App() {
                       </div>
                       <div className="flex-1">
                         <p className="text-sm font-bold">Ace's Tip of the Day</p>
-                        <p className="text-xs text-text-secondary">"Try the Pomodoro technique for better focus."</p>
+                        <p className="text-xs text-zinc-600">"Try the Pomodoro technique for better focus."</p>
                       </div>
                       <ChevronRight size={16} className="text-zinc-300" />
                     </div>
@@ -2972,6 +3019,11 @@ export default function App() {
                 friends={friends} 
                 friendProfiles={friendProfiles} 
                 onAddFriend={handleAddFriend} 
+                onChat={(friend: any) => {
+                  setChatType('User');
+                  setSelectedBuddy({ uid: friend.id, displayName: friend.name });
+                  setIsChatOpen(true);
+                }}
               />
             </motion.div>
           )}
@@ -3656,7 +3708,7 @@ export default function App() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-6"
+            className="fixed inset-0 max-w-md mx-auto bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-6"
           >
             <Card className="max-w-md w-full p-8">
               <div className="flex justify-between items-center mb-6">
@@ -3686,7 +3738,7 @@ export default function App() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-6"
+            className="fixed inset-0 max-w-md mx-auto bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-6"
           >
             <Card className="max-w-sm w-full p-8">
               <div className="flex justify-between items-center mb-6">
@@ -3731,7 +3783,7 @@ export default function App() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-zinc-900 z-[150] flex flex-col items-center justify-center p-6 text-white"
+            className="fixed inset-0 max-w-md mx-auto bg-zinc-900 z-[150] flex flex-col items-center justify-center p-6 text-white"
           >
             <div className="absolute top-6 sm:top-10 left-6 sm:left-10 flex items-center gap-3">
               <Sparkles className="text-emerald-400 sm:w-6 sm:h-6" size={16} />
@@ -3832,7 +3884,7 @@ export default function App() {
 }
 
 const LogoutConfirmModal = ({ onConfirm, onCancel }: any) => (
-  <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[150] flex items-center justify-center p-4">
+  <div className="fixed inset-0 max-w-md mx-auto bg-black/40 backdrop-blur-sm z-[150] flex items-center justify-center p-4">
     <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="max-w-sm w-full">
       <Card className="p-8 text-center">
         <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -3880,7 +3932,7 @@ const ForgotPasswordModal = ({ onClose, initialEmail = '' }: any) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[150] flex items-center justify-center p-4">
+    <div className="fixed inset-0 max-w-md mx-auto bg-black/40 backdrop-blur-sm z-[150] flex items-center justify-center p-4">
       <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="max-w-md w-full">
         <Card className="p-8">
           <div className="flex justify-between items-center mb-6">
@@ -3989,7 +4041,7 @@ const ChangePasswordModal = ({ onClose, onForgotPassword }: { onClose: () => voi
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4"
+      className="fixed inset-0 max-w-md mx-auto bg-black/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4"
     >
       <motion.div 
         initial={{ scale: 0.9, opacity: 0 }}
@@ -4098,7 +4150,7 @@ function BottomNav({ activeTab, onNavigate }: any) {
   ];
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 h-20 bg-bg-card/80 backdrop-blur-xl border-t border-slate-800 flex items-center justify-around px-6 z-50">
+    <div className="fixed bottom-0 max-w-md mx-auto w-full h-20 bg-bg-card/80 backdrop-blur-xl border-t border-slate-800 flex items-center justify-around px-6 z-50">
       {tabs.map(tab => (
         <button 
           key={tab.id}
@@ -4114,14 +4166,14 @@ function BottomNav({ activeTab, onNavigate }: any) {
 }
 
 const WelcomeScreen = ({ onLogin, onSignUp }: any) => (
-  <div className="min-h-screen flex flex-col items-center justify-center p-8 bg-bg-dark text-center">
+  <div className="max-w-md mx-auto min-h-screen flex flex-col items-center justify-center p-8 bg-bg-dark text-center relative shadow-2xl border-x border-zinc-800 overflow-x-hidden">
     <motion.div 
       initial={{ scale: 0.8, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
       className="mb-12"
     >
       <div className="w-32 h-32 bg-brand-primary rounded-[2.5rem] flex items-center justify-center shadow-2xl shadow-brand-primary/30 mx-auto mb-8">
-        <BookOpen size={64} className="text-white" />
+        <GraduationCap size={64} className="text-white" />
       </div>
       <h1 className="text-5xl font-black tracking-tighter mb-4">Study Buddy</h1>
       <p className="text-text-secondary font-bold uppercase tracking-[0.2em]">Plan • Study • Succeed</p>
@@ -4139,7 +4191,7 @@ const LoginScreen = ({ onBack, onLogin, isSignUp }: any) => {
   const [password, setPassword] = useState('');
 
   return (
-    <div className="min-h-screen flex flex-col p-8 bg-bg-dark">
+    <div className="max-w-md mx-auto min-h-screen flex flex-col p-8 bg-bg-dark relative shadow-2xl border-x border-zinc-800 overflow-x-hidden">
       <button onClick={onBack} className="mb-12 self-start p-2 hover:bg-white/5 rounded-xl transition-colors">
         <ArrowLeft size={24} />
       </button>
@@ -4323,7 +4375,7 @@ function Onboarding({ profile, onComplete, user }: any) {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-50 flex flex-col items-center justify-start p-4 sm:p-6 overflow-y-auto">
+    <div className="max-w-md mx-auto min-h-screen bg-zinc-50 flex flex-col items-center justify-start p-4 sm:p-6 overflow-y-auto relative shadow-2xl border-x border-zinc-200 overflow-x-hidden">
       <Card className="max-w-md w-full p-6 sm:p-8 my-auto">
         <div className="flex justify-between items-center mb-8">
           <div className="flex gap-1">

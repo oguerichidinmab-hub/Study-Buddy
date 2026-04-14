@@ -88,7 +88,7 @@ async function testConnection() {
     }
   }
 }
-testConnection();
+testConnection().catch(() => {});
 
 export { 
   signInWithPopup, 
