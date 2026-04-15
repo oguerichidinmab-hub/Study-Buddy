@@ -23,9 +23,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { io, Socket } from "socket.io-client";
 
 // Initialize socket
-const socket: Socket = io();
+const socket: Socket = io({
+  transports: ["websocket"]
+});
 socket.on("connect_error", (err) => {
-  console.error("Socket connection error:", err);
+  console.error("Socket connection error:", err.message);
 });
 import { UserProfile, Schedule, ScheduleBlock, StudySession, QuizResult, ExamQuestion } from './types';
 import { generateTimetable, getBuddyMessage, generateQuiz, createBuddyChat } from './services/geminiService';
@@ -664,7 +666,7 @@ const PastQuestions = ({ onAction }: any) => {
       
       <div className="space-y-3">
         {subjects.map((s, i) => (
-          <Card key={i} className="p-4 flex items-center justify-between">
+          <Card key={i} className="p-4 flex items-center justify-between cursor-pointer hover:bg-zinc-50 transition-colors" onClick={() => onAction('practice')}>
             <div className="flex items-center gap-4">
               <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
                 s.color === 'emerald' ? 'bg-emerald-500/10 text-emerald-400' :
@@ -1405,8 +1407,10 @@ const BuddyChatModal = ({ user, profile, onClose, initialMessage, isAI: propIsAI
     }
   }, [messages]);
 
-  const handleSend = async (customMsg?: string) => {
-    const msgToSend = customMsg || input.trim();
+  const handleSend = async (customMsg?: string | React.MouseEvent) => {
+    const isString = typeof customMsg === 'string';
+    const msgToSend = isString ? customMsg : input.trim();
+    
     if (!msgToSend || loading || !user) {
       console.log("handleSend blocked:", { msgToSend, loading, user: !!user });
       return;
@@ -1414,7 +1418,7 @@ const BuddyChatModal = ({ user, profile, onClose, initialMessage, isAI: propIsAI
 
     const timestamp = Date.now();
 
-    if (!customMsg) {
+    if (!isString) {
       setInput('');
       setMessages(prev => [...prev, { role: 'user', text: msgToSend, timestamp, senderId: user.uid }]);
     }
@@ -1548,7 +1552,7 @@ const BuddyChatModal = ({ user, profile, onClose, initialMessage, isAI: propIsAI
             />
           </div>
           <button 
-            onClick={handleSend} 
+            onClick={() => handleSend()} 
             disabled={loading || !input.trim()}
             className={`p-3 rounded-full transition-all shadow-md ${
               !input.trim() ? 'bg-zinc-400 text-white' : 'bg-[#128C7E] text-white active:scale-95'
@@ -3035,7 +3039,10 @@ export default function App() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
             >
-              <PastQuestions onAction={(action: string) => action === 'back' && handleBack()} />
+              <PastQuestions onAction={(action: string) => {
+                if (action === 'back') handleBack();
+                else if (action === 'practice') setShowExamPractice(true);
+              }} />
             </motion.div>
           )}
 
