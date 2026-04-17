@@ -815,96 +815,6 @@ const PastQuestions = ({ onAction }: any) => {
   );
 };
 
-const Dashboard = ({ user, onAction }: any) => {
-  const tasks = [
-    { name: 'Math', icon: Brain, color: 'amber', progress: 3 },
-    { name: 'History', icon: BookOpen, color: 'emerald', progress: 2 },
-    { name: 'Free Time', icon: Coffee, color: 'rose', progress: 1 },
-  ];
-
-  return (
-    <div className="flex-1 overflow-y-auto pb-32">
-      <div className="p-6 space-y-8">
-        {/* Header */}
-        <div className="flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <img src="https://picsum.photos/seed/user/100/100" className="w-12 h-12 rounded-2xl object-cover border-2 border-brand-primary" referrerPolicy="no-referrer" />
-            <div>
-              <h2 className="text-2xl font-black">Hi, {user?.displayName?.split(' ')[0] || 'Alex'}!</h2>
-              <p className="text-text-secondary text-xs font-bold uppercase tracking-widest">Ready for today?</p>
-            </div>
-          </div>
-          <button onClick={() => onAction('notifications')} className="w-12 h-12 bg-bg-card border border-slate-800 rounded-2xl flex items-center justify-center relative">
-            <Bell size={24} />
-            <span className="absolute top-3 right-3 w-3 h-3 bg-brand-accent rounded-full border-2 border-bg-dark" />
-          </button>
-        </div>
-
-        {/* Today's Tasks */}
-        <section className="space-y-4">
-          <h3 className="text-sm font-black text-text-secondary uppercase tracking-[0.2em]">Today's Tasks</h3>
-          <div className="space-y-3">
-            {tasks.map((task, i) => (
-              <Card key={i} className="p-4 flex items-center gap-4">
-                <div className={`w-10 h-10 rounded-xl bg-brand-${task.color}/20 text-brand-${task.color} flex items-center justify-center`}>
-                  <task.icon size={20} />
-                </div>
-                <div className="flex-1">
-                  <h4 className="font-bold">{task.name}</h4>
-                </div>
-                <div className="flex gap-1">
-                  {[1, 2, 3].map(dot => (
-                    <div key={dot} className={`w-2 h-2 rounded-full ${dot <= task.progress ? `bg-brand-${task.color}` : 'bg-slate-800'}`} />
-                  ))}
-                </div>
-              </Card>
-            ))}
-          </div>
-        </section>
-
-        {/* Quick Actions Grid */}
-        <div className="grid grid-cols-3 gap-4">
-          {[
-            { icon: Users, label: 'Friends', action: 'friends', color: 'emerald' },
-            { icon: MessageSquare, label: 'Chat', action: 'chat', color: 'blue' },
-            { icon: Award, label: 'Awards', action: 'achievements', color: 'amber' },
-          ].map((item, i) => (
-            <button 
-              key={i} 
-              onClick={() => onAction(item.action)}
-              className="flex flex-col items-center gap-2 p-4 bg-bg-card border border-slate-800 rounded-2xl active:scale-95 transition-all"
-            >
-              <div className={`w-10 h-10 rounded-xl bg-brand-${item.color}/20 text-brand-${item.color} flex items-center justify-center`}>
-                <item.icon size={20} />
-              </div>
-              <span className="text-[10px] font-bold uppercase tracking-widest text-text-secondary">{item.label}</span>
-            </button>
-          ))}
-        </div>
-
-        {/* Buddy Card */}
-        <Card className="bg-brand-primary text-white p-6 relative overflow-hidden">
-          <div className="relative z-10">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-slate-800/20 rounded-xl flex items-center justify-center">
-                <Brain size={24} />
-              </div>
-              <span className="font-black uppercase tracking-widest text-xs">Ace • Your Buddy</span>
-            </div>
-            <p className="text-xl font-bold mb-6 leading-tight">"You're doing great! Let's tackle that Math quiz today."</p>
-            <Button variant="secondary" className="bg-slate-800 text-brand-primary border-none" onClick={() => onAction('chat')}>
-              Chat with Ace
-            </Button>
-          </div>
-          <div className="absolute -right-8 -bottom-8 opacity-10 rotate-12">
-            <Brain size={160} />
-          </div>
-        </Card>
-      </div>
-    </div>
-  );
-};
-
 const Timetable = ({ onAction }: any) => {
   const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
   const grid = [
@@ -2592,6 +2502,14 @@ export default function App() {
 
   // --- Views ---
 
+  if (showSplash) {
+    return (
+      <AnimatePresence>
+        <SplashScreen key="splash" />
+      </AnimatePresence>
+    );
+  }
+
   if (loading) {
     return (
       <div className="w-full lg:max-w-7xl mx-auto min-h-screen flex flex-col items-center justify-center bg-slate-900 p-6 relative shadow-2xl border-x border-slate-600 overflow-x-hidden">
@@ -2706,9 +2624,6 @@ export default function App() {
 
   return (
     <>
-      <AnimatePresence>
-        {showSplash && <SplashScreen />}
-      </AnimatePresence>
       <div className={`w-full lg:max-w-7xl mx-auto min-h-screen bg-slate-900 pb-24 pt-20 relative shadow-2xl border-x border-slate-600 overflow-x-hidden ${accessibilitySettings.highContrast ? 'contrast-125' : ''} ${accessibilitySettings.largeText ? 'text-lg' : ''}`}>
       
       {!isOnline && (
