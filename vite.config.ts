@@ -20,6 +20,9 @@ export default defineConfig(({mode}) => {
         registerType: 'autoUpdate',
         injectRegister: 'auto',
         includeAssets: ['mask-icon.svg'],
+        workbox: {
+          globPatterns: ['**/*.{js,css,html,ico,png,svg,json}'],
+        },
         manifest: {
           name: 'Study Buddy | AI Academic Companion',
           short_name: 'StudyBuddy',

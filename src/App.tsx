@@ -24,6 +24,7 @@ import { io, Socket } from "socket.io-client";
 
 // Initialize socket
 const socket: Socket = io({
+  path: "/api/socket.io",
   transports: ["polling", "websocket"]
 });
 socket.on("connect_error", (err) => {
@@ -32,6 +33,7 @@ socket.on("connect_error", (err) => {
 import { UserProfile, Schedule, ScheduleBlock, StudySession, QuizResult, ExamQuestion } from './types';
 import { generateTimetable, getBuddyMessage, generateQuiz, createBuddyChat } from './services/geminiService';
 import { PRACTICE_QUESTIONS } from './data/practiceQuestions';
+import { PreAuthOnboarding } from './components/PreAuthOnboarding';
 
 // --- Components ---
 
@@ -39,7 +41,7 @@ const SplashScreen = () => (
   <motion.div 
     initial={{ opacity: 1 }}
     exit={{ opacity: 0 }}
-    className="fixed inset-0 max-w-md mx-auto bg-[#10B981] z-[300] flex flex-col items-center justify-center text-white"
+    className="fixed inset-0 w-full bg-[#10B981] z-[300] flex flex-col items-center justify-center text-white"
   >
     <motion.div
       initial={{ scale: 0.8, opacity: 0 }}
@@ -47,23 +49,15 @@ const SplashScreen = () => (
       transition={{ duration: 0.5 }}
       className="flex flex-col items-center"
     >
-      <div className="w-24 h-24 bg-white/20 rounded-3xl flex items-center justify-center mb-6 backdrop-blur-md">
+      <div className="w-24 h-24 bg-slate-800/20 rounded-3xl flex items-center justify-center mb-6 backdrop-blur-md">
         <GraduationCap size={48} className="text-white" />
       </div>
-      <h1 className="text-4xl font-black tracking-tighter mb-2">Study Buddy</h1>
-      <p className="text-white/60 font-medium uppercase tracking-widest text-xs">Your AI Academic Companion</p>
+      <h1 className="text-4xl font-black tracking-tighter">Study Buddy</h1>
     </motion.div>
     <div className="absolute bottom-12">
-      <div className="flex gap-1">
-        {[0, 1, 2].map(i => (
-          <motion.div
-            key={i}
-            animate={{ opacity: [0.3, 1, 0.3] }}
-            transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }}
-            className="w-2 h-2 bg-white rounded-full"
-          />
-        ))}
-      </div>
+      <p className="text-white/80 font-medium tracking-widest text-sm text-center">
+        made by team GENCHAN
+      </p>
     </div>
   </motion.div>
 );
@@ -72,7 +66,7 @@ const Button = ({ children, onClick, variant = 'primary', className = '', disabl
   const variants: any = {
     primary: 'bg-brand-primary text-white hover:bg-brand-primary/90 shadow-lg shadow-brand-primary/20',
     secondary: 'bg-bg-card text-text-primary border border-slate-700 hover:bg-slate-800',
-    ghost: 'bg-transparent text-text-secondary hover:bg-white/5',
+    ghost: 'bg-transparent text-text-secondary hover:bg-slate-800/5',
     danger: 'bg-red-500/10 text-red-500 hover:bg-red-500/20',
     accent: 'bg-brand-secondary text-white hover:bg-brand-secondary/90 shadow-lg shadow-brand-secondary/20',
     pink: 'bg-brand-accent text-white hover:bg-brand-accent/90 shadow-lg shadow-brand-accent/20',
@@ -94,7 +88,7 @@ const Card = ({ children, className = '', id, onClick }: any) => (
   <div 
     id={id} 
     onClick={onClick}
-    className={`bg-white border border-zinc-100 rounded-[2rem] p-6 shadow-sm ${onClick ? 'cursor-pointer active:scale-[0.98] transition-transform' : ''} ${className}`}
+    className={`bg-slate-800 border border-slate-700 rounded-[2rem] p-6 shadow-sm ${onClick ? 'cursor-pointer active:scale-[0.98] transition-transform' : ''} ${className}`}
   >
     {children}
   </div>
@@ -118,7 +112,7 @@ const Badge = ({ children, color = 'emerald' }: any) => {
 const NavButton = ({ active, onClick, icon: Icon, label }: any) => (
   <button 
     onClick={onClick}
-    className={`flex flex-col lg:flex-row items-center gap-2 p-4 rounded-2xl transition-all w-full ${active ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/20' : 'text-text-secondary hover:bg-white/5'}`}
+    className={`flex flex-col lg:flex-row items-center gap-2 p-4 rounded-2xl transition-all w-full ${active ? 'bg-brand-primary text-white shadow-lg shadow-brand-primary/20' : 'text-text-secondary hover:bg-slate-800/5'}`}
   >
     <Icon size={24} />
     <span className="text-[10px] lg:text-sm font-bold uppercase tracking-widest lg:normal-case lg:tracking-normal">{label}</span>
@@ -184,7 +178,7 @@ const Quiz = ({ subject, educationLevel, targetExams, cachedQuestions, onCacheQu
 
   if (loading) {
     return (
-      <div className="fixed inset-0 max-w-md mx-auto bg-bg-dark/80 backdrop-blur-sm z-[120] flex items-center justify-center">
+      <div className="fixed inset-0 w-full bg-bg-dark/80 backdrop-blur-sm z-[120] flex items-center justify-center">
         <Card className="p-8 text-center space-y-4">
           <RefreshCw className="animate-spin text-brand-primary mx-auto" size={48} />
           <h3 className="text-xl font-bold">Generating Quiz...</h3>
@@ -196,7 +190,7 @@ const Quiz = ({ subject, educationLevel, targetExams, cachedQuestions, onCacheQu
 
   if (finished) {
     return (
-      <div className="fixed inset-0 max-w-md mx-auto bg-bg-dark/80 backdrop-blur-sm z-[120] flex items-center justify-center p-6">
+      <div className="fixed inset-0 w-full bg-bg-dark/80 backdrop-blur-sm z-[120] flex items-center justify-center p-6">
         <Card className="max-w-md w-full p-8 text-center space-y-6">
           <div className="w-20 h-20 bg-brand-primary/20 text-brand-primary rounded-full flex items-center justify-center mx-auto">
             <Award size={48} />
@@ -217,12 +211,12 @@ const Quiz = ({ subject, educationLevel, targetExams, cachedQuestions, onCacheQu
   const currentQ = questions[currentIdx];
 
   return (
-    <div className="fixed inset-0 max-w-md mx-auto bg-bg-dark/80 backdrop-blur-sm z-[120] flex items-center justify-center p-6">
+    <div className="fixed inset-0 w-full bg-bg-dark/80 backdrop-blur-sm z-[120] flex items-center justify-center p-6">
       <Card className="max-w-2xl w-full p-8 space-y-8">
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-3">
             <Badge color="violet">{subject}</Badge>
-            <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${timeLeft < 60 ? 'bg-rose-500/10 text-rose-400 border-rose-500/20 animate-pulse' : 'bg-slate-800 text-zinc-400 border-slate-700'}`}>
+            <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${timeLeft < 60 ? 'bg-rose-500/10 text-rose-400 border-rose-500/20 animate-pulse' : 'bg-slate-800 text-slate-500 border-slate-700'}`}>
               <Timer size={14} />
               {formatTime(timeLeft)}
             </div>
@@ -235,7 +229,7 @@ const Quiz = ({ subject, educationLevel, targetExams, cachedQuestions, onCacheQu
             <button 
               key={idx}
               onClick={() => handleAnswer(idx === currentQ.correctAnswer)}
-              className="p-4 rounded-2xl border border-slate-800 text-left hover:bg-white/5 transition-all font-medium"
+              className="p-4 rounded-2xl border border-slate-800 text-left hover:bg-slate-800/5 transition-all font-medium"
             >
               {opt}
             </button>
@@ -275,7 +269,7 @@ const Friends = ({ user, friends, friendProfiles, onAddFriend, onChat }: any) =>
       <div className="space-y-4">
         {friendList.length === 0 ? (
           <Card className="p-8 text-center">
-            <Users className="mx-auto text-zinc-200 mb-4" size={48} />
+            <Users className="mx-auto text-slate-200 mb-4" size={48} />
             <p className="text-text-secondary">No friends yet. Add some study buddies!</p>
           </Card>
         ) : (
@@ -306,11 +300,11 @@ const Friends = ({ user, friends, friendProfiles, onAddFriend, onChat }: any) =>
       <Button className="w-full mt-8" icon={Plus} onClick={() => setShowAddModal(true)}>Add New Friend</Button>
 
       {showAddModal && (
-        <div className="fixed inset-0 max-w-md mx-auto bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-6">
+        <div className="fixed inset-0 w-full bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-6">
           <Card className="max-w-md w-full p-8 space-y-6">
             <div className="flex justify-between items-center">
               <h3 className="text-2xl font-bold">Add Study Buddy</h3>
-              <button onClick={() => setShowAddModal(false)} className="p-2 hover:bg-zinc-100 rounded-full"><X size={20} /></button>
+              <button onClick={() => setShowAddModal(false)} className="p-2 hover:bg-slate-800 rounded-full"><X size={20} /></button>
             </div>
             <div className="space-y-4">
               <p className="text-text-secondary text-sm">Enter your friend's email address to add them to your study circle.</p>
@@ -321,7 +315,7 @@ const Friends = ({ user, friends, friendProfiles, onAddFriend, onChat }: any) =>
                   value={friendEmail}
                   onChange={(e) => setFriendEmail(e.target.value)}
                   placeholder="buddy@example.com"
-                  className="w-full p-4 bg-zinc-50 border border-zinc-100 rounded-2xl focus:outline-none focus:border-emerald-500"
+                  className="w-full p-4 bg-slate-900 border border-slate-700 rounded-2xl focus:outline-none focus:border-emerald-500"
                 />
               </div>
               <Button 
@@ -381,7 +375,7 @@ const QuizBattle = ({ onAction }: any) => {
   return (
     <div className="flex-1 overflow-y-auto pb-32 p-6">
       <div className="flex items-center gap-4 mb-8">
-        <button onClick={() => onAction('back')} className="p-2 hover:bg-white/5 rounded-xl">
+        <button onClick={() => onAction('back')} className="p-2 hover:bg-slate-800/5 rounded-xl">
           <ArrowLeft size={24} />
         </button>
         <h2 className="text-2xl font-black">Quiz Battle</h2>
@@ -489,7 +483,7 @@ const DailyGoals = ({ onAction }: any) => {
   return (
     <div className="flex-1 overflow-y-auto pb-32 p-6">
       <div className="flex items-center gap-4 mb-8">
-        <button onClick={() => onAction('back')} className="p-2 hover:bg-white/5 rounded-xl">
+        <button onClick={() => onAction('back')} className="p-2 hover:bg-slate-800/5 rounded-xl">
           <ArrowLeft size={24} />
         </button>
         <h2 className="text-2xl font-black">Daily Goals</h2>
@@ -511,35 +505,86 @@ const DailyGoals = ({ onAction }: any) => {
   );
 };
 
-const Notifications = ({ onAction }: any) => {
-  const notifications = [
-    { title: 'New Quiz!', desc: 'Math quiz is ready for you', time: '2m ago', icon: Zap, color: 'amber' },
-    { title: 'Emma challenged you!', desc: 'Quiz battle in Physics', time: '1h ago', icon: Users, color: 'rose' },
-    { title: 'Math Result', desc: 'You scored 85% in Algebra', time: '3h ago', icon: Award, color: 'emerald' },
-  ];
-
+const Notifications = ({ notifications, onAction }: any) => {
   return (
     <div className="flex-1 overflow-y-auto pb-32 p-6">
       <div className="flex items-center gap-4 mb-8">
-        <button onClick={() => onAction('back')} className="p-2 hover:bg-white/5 rounded-xl">
+        <button onClick={() => onAction('back')} className="p-2 hover:bg-slate-800/5 rounded-xl">
           <ArrowLeft size={24} />
         </button>
-        <h2 className="text-2xl font-black">Notifications</h2>
+        <h2 className="text-2xl font-black text-white">Notifications</h2>
       </div>
       
       <div className="space-y-4">
-        {notifications.map((n, i) => (
-          <Card key={i} className="p-5 flex items-center gap-4">
-            <div className={`w-12 h-12 rounded-2xl bg-brand-${n.color}/20 text-brand-${n.color} flex items-center justify-center`}>
-              <n.icon size={24} />
-            </div>
-            <div className="flex-1">
-              <h3 className="font-bold">{n.title}</h3>
-              <p className="text-xs text-text-secondary">{n.desc}</p>
-            </div>
-            <span className="text-[10px] font-bold text-text-muted">{n.time}</span>
-          </Card>
-        ))}
+        {notifications.map((n: any, i: number) => {
+          let IconComponent = Zap;
+          if (n.icon === 'users') IconComponent = Users;
+          if (n.icon === 'award') IconComponent = Award;
+
+          return (
+            <Card key={i} className="p-5 flex items-center gap-4">
+              <div className={`w-12 h-12 rounded-2xl bg-${n.color}-500/20 text-${n.color}-500 flex items-center justify-center`}>
+                <IconComponent size={24} />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-bold text-white">{n.title}</h3>
+                <p className="text-xs text-slate-300">{n.desc}</p>
+              </div>
+              <span className="text-[10px] font-bold text-slate-500">{n.time}</span>
+            </Card>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+const PublicProfile = ({ profile, user, onAction }: any) => {
+  return (
+    <div className="flex-1 overflow-y-auto pb-32 p-6">
+      <div className="flex items-center gap-4 mb-8">
+        <button onClick={() => onAction('back')} className="p-2 hover:bg-slate-800/5 rounded-xl">
+          <ArrowLeft size={24} />
+        </button>
+        <h2 className="text-2xl font-black text-white">Public Profile</h2>
+      </div>
+      
+      <div className="max-w-md mx-auto space-y-6">
+        <Card className="flex flex-col items-center text-center p-8 bg-slate-800">
+          <img src={`https://picsum.photos/seed/${user?.uid || 'default'}/150/150`} alt="Avatar" className="w-24 h-24 rounded-full border-4 border-slate-700 shadow-xl mb-4" />
+          <h3 className="text-2xl font-bold text-white mb-2">{profile?.displayName || 'Student'}</h3>
+          <p className="text-emerald-500 font-medium">{profile?.educationLevel || 'General Studies'}</p>
+          <div className="flex flex-wrap justify-center gap-2 mt-4">
+            {profile?.targetExams?.map((exam: string) => (
+              <Badge key={exam} color="violet">{exam}</Badge>
+            ))}
+          </div>
+        </Card>
+
+        <section>
+          <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-4">Subjects</h3>
+          <div className="flex flex-wrap gap-2">
+            {profile?.subjects?.map((subj: string) => (
+              <span key={subj} className="px-3 py-1 bg-slate-700 text-slate-200 rounded-full text-sm font-medium">{subj}</span>
+            ))}
+          </div>
+        </section>
+
+        <section>
+          <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-4">Stats & Achievements</h3>
+          <div className="grid grid-cols-2 gap-4">
+            <Card className="p-4 bg-slate-800">
+              <div className="text-3xl mb-2">🏆</div>
+              <h4 className="font-bold text-white">3 Day Streak</h4>
+              <p className="text-xs text-slate-400">Keep it up!</p>
+            </Card>
+            <Card className="p-4 bg-slate-800">
+              <div className="text-3xl mb-2">📐</div>
+              <h4 className="font-bold text-white">Math Master</h4>
+              <p className="text-xs text-slate-400">85% Avg Score</p>
+            </Card>
+          </div>
+        </section>
       </div>
     </div>
   );
@@ -555,7 +600,7 @@ const Achievements = ({ onAction }: any) => {
   return (
     <div className="flex-1 overflow-y-auto pb-32 p-6">
       <div className="flex items-center gap-4 mb-8">
-        <button onClick={() => onAction('back')} className="p-2 hover:bg-white/5 rounded-xl">
+        <button onClick={() => onAction('back')} className="p-2 hover:bg-slate-800/5 rounded-xl">
           <ArrowLeft size={24} />
         </button>
         <h2 className="text-2xl font-black">Achievements</h2>
@@ -591,7 +636,7 @@ const StudyTips = ({ onAction }: any) => {
   return (
     <div className="flex-1 overflow-y-auto pb-32 p-6">
       <div className="flex items-center gap-4 mb-8">
-        <button onClick={() => onAction('back')} className="p-2 hover:bg-white/5 rounded-xl">
+        <button onClick={() => onAction('back')} className="p-2 hover:bg-slate-800/5 rounded-xl">
           <ArrowLeft size={24} />
         </button>
         <h2 className="text-2xl font-black">Study Tips</h2>
@@ -605,7 +650,7 @@ const StudyTips = ({ onAction }: any) => {
             </div>
             <div className="flex-1">
               <h3 className="font-bold">{tip.title}</h3>
-              <p className="text-xs text-zinc-600">{tip.desc}</p>
+              <p className="text-xs text-slate-300">{tip.desc}</p>
             </div>
           </Card>
         ))}
@@ -615,31 +660,116 @@ const StudyTips = ({ onAction }: any) => {
 };
 
 const StudyChat = ({ onAction }: any) => {
+  const [activeChat, setActiveChat] = useState<any>(null);
+  const [messages, setMessages] = useState([
+    { id: 1, sender: 'Emma', text: 'Hey, are you studying for Physics?', time: '10:00 AM', isMe: false },
+    { id: 2, sender: 'Me', text: 'Yes! Just started chapter 4.', time: '10:05 AM', isMe: true },
+    { id: 3, sender: 'Emma', text: 'Awesome, want to do a quick quiz later?', time: '10:06 AM', isMe: false }
+  ]);
+  const [inputValue, setInputValue] = useState('');
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
   const chats = [
-    { name: 'Physics Group', lastMsg: 'See you at 5!', time: '2m', avatar: 'https://picsum.photos/seed/phys/100/100' },
-    { name: 'Emma', lastMsg: 'Ready for the quiz?', time: '1h', avatar: 'https://picsum.photos/seed/emma/100/100' },
-    { name: 'Ryan', lastMsg: 'Thanks for the help!', time: '3h', avatar: 'https://picsum.photos/seed/ryan/100/100' },
+    { id: 1, name: 'Physics Group', lastMsg: 'See you at 5!', time: '2m', avatar: 'https://picsum.photos/seed/phys/100/100' },
+    { id: 2, name: 'Emma', lastMsg: 'Ready for the quiz?', time: '1h', avatar: 'https://picsum.photos/seed/emma/100/100' },
+    { id: 3, name: 'Ryan', lastMsg: 'Thanks for the help!', time: '3h', avatar: 'https://picsum.photos/seed/ryan/100/100' },
   ];
+
+  const handleSend = () => {
+    if (!inputValue.trim()) return;
+    const newMsg = {
+      id: Date.now(),
+      sender: 'Me',
+      text: inputValue,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      isMe: true
+    };
+    setMessages([...messages, newMsg]);
+    setInputValue('');
+    setTimeout(() => {
+      chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
+  };
+
+  if (activeChat) {
+    return (
+      <div className="flex flex-col h-full bg-slate-900 pb-24 absolute inset-0 z-50">
+        <header className="flex items-center gap-3 bg-slate-800 p-4 border-b border-slate-700 shadow-sm sticky top-0 z-20">
+          <button onClick={() => setActiveChat(null)} className="p-2 -ml-2 hover:bg-slate-700 rounded-xl transition-colors">
+            <ArrowLeft size={24} className="text-slate-300" />
+          </button>
+          <img src={activeChat.avatar} alt={activeChat.name} className="w-10 h-10 rounded-full object-cover" referrerPolicy="no-referrer" />
+          <div>
+            <h2 className="font-bold text-white leading-tight">{activeChat.name}</h2>
+            <p className="text-xs text-emerald-500 font-medium">Online</p>
+          </div>
+        </header>
+
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          <div className="text-center text-xs text-slate-500 my-4">Today</div>
+          {messages.map((m) => (
+            <div key={m.id} className={`flex ${m.isMe ? 'justify-end' : 'justify-start'}`}>
+              <div className={`max-w-[75%] rounded-2xl p-3 shadow-md relative ${m.isMe ? 'bg-emerald-600 text-white rounded-br-sm' : 'bg-slate-800 text-slate-100 border border-slate-700 rounded-bl-sm'}`}>
+                <p className="text-sm">{m.text}</p>
+                <div className="flex items-center justify-end gap-1 mt-1">
+                  <span className={`text-[10px] ${m.isMe ? 'text-emerald-200' : 'text-slate-400'}`}>{m.time}</span>
+                  {m.isMe && <Check size={12} className="text-emerald-200" />}
+                </div>
+              </div>
+            </div>
+          ))}
+          <div ref={chatEndRef} />
+        </div>
+
+        <div className="p-4 bg-slate-800 border-t border-slate-700 w-full mb-16 lg:mb-0">
+          <div className="flex items-center gap-2 max-w-7xl mx-auto">
+            <input 
+              type="text"
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+              placeholder="Message..."
+              className="flex-1 bg-slate-900 border border-slate-700 rounded-full py-3 px-5 text-sm text-white focus:outline-none focus:border-emerald-500"
+            />
+            <button 
+              onClick={handleSend}
+              className={`w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-transform ${inputValue.trim() ? 'bg-emerald-600 text-white hover:scale-105 active:scale-95' : 'bg-slate-700 text-slate-400 cursor-not-allowed'}`}
+              disabled={!inputValue.trim()}
+            >
+              <Zap size={20} className={inputValue.trim() ? "fill-current" : ""} />
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 overflow-y-auto pb-32 p-6">
       <div className="flex items-center gap-4 mb-8">
-        <button onClick={() => onAction('back')} className="p-2 hover:bg-white/5 rounded-xl">
+        <button onClick={() => onAction('back')} className="p-2 hover:bg-slate-800/5 rounded-xl">
           <ArrowLeft size={24} />
         </button>
-        <h2 className="text-2xl font-black">Study Chat</h2>
+        <h2 className="text-2xl font-black text-white">Study Chat</h2>
       </div>
       
       <div className="space-y-4">
-        {chats.map((chat, i) => (
-          <Card key={i} className="p-4 flex items-center gap-4">
-            <img src={chat.avatar} alt={chat.name} className="w-12 h-12 rounded-2xl object-cover" referrerPolicy="no-referrer" />
+        {chats.map((chat) => (
+          <div 
+            key={chat.id} 
+            onClick={() => setActiveChat(chat)}
+            className="p-4 bg-slate-800 border border-slate-700 rounded-[2rem] flex items-center gap-4 cursor-pointer hover:bg-slate-700/50 transition-colors shadow-sm active:scale-[0.98]"
+          >
+            <img src={chat.avatar} alt={chat.name} className="w-14 h-14 rounded-2xl object-cover shadow-sm" referrerPolicy="no-referrer" />
             <div className="flex-1">
-              <h3 className="font-bold">{chat.name}</h3>
-              <p className="text-xs text-text-secondary truncate">{chat.lastMsg}</p>
+              <h3 className="font-bold text-slate-100">{chat.name}</h3>
+              <p className="text-sm text-slate-400 truncate">{chat.lastMsg}</p>
             </div>
-            <span className="text-[10px] font-bold text-text-muted">{chat.time}</span>
-          </Card>
+            <div className="flex flex-col items-end gap-1">
+              <span className="text-xs font-medium text-slate-500">{chat.time}</span>
+              {chat.id === 2 && <span className="w-5 h-5 bg-emerald-500 text-white rounded-full flex items-center justify-center text-[10px] font-bold">1</span>}
+            </div>
+          </div>
         ))}
       </div>
       <Button className="w-full mt-8" icon={Plus}>New Message</Button>
@@ -658,7 +788,7 @@ const PastQuestions = ({ onAction }: any) => {
   return (
     <div className="flex-1 overflow-y-auto pb-32 p-6">
       <div className="flex items-center gap-4 mb-8">
-        <button onClick={() => onAction('back')} className="p-2 hover:bg-white/5 rounded-xl">
+        <button onClick={() => onAction('back')} className="p-2 hover:bg-slate-800/5 rounded-xl">
           <ArrowLeft size={24} />
         </button>
         <h2 className="text-2xl font-black">Past Questions</h2>
@@ -666,7 +796,7 @@ const PastQuestions = ({ onAction }: any) => {
       
       <div className="space-y-3">
         {subjects.map((s, i) => (
-          <Card key={i} className="p-4 flex items-center justify-between cursor-pointer hover:bg-zinc-50 transition-colors" onClick={() => onAction('practice')}>
+          <Card key={i} className="p-4 flex items-center justify-between cursor-pointer hover:bg-slate-900 transition-colors" onClick={() => onAction('practice')}>
             <div className="flex items-center gap-4">
               <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
                 s.color === 'emerald' ? 'bg-emerald-500/10 text-emerald-400' :
@@ -756,13 +886,13 @@ const Dashboard = ({ user, onAction }: any) => {
         <Card className="bg-brand-primary text-white p-6 relative overflow-hidden">
           <div className="relative z-10">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+              <div className="w-10 h-10 bg-slate-800/20 rounded-xl flex items-center justify-center">
                 <Brain size={24} />
               </div>
               <span className="font-black uppercase tracking-widest text-xs">Ace • Your Buddy</span>
             </div>
             <p className="text-xl font-bold mb-6 leading-tight">"You're doing great! Let's tackle that Math quiz today."</p>
-            <Button variant="secondary" className="bg-white text-brand-primary border-none" onClick={() => onAction('chat')}>
+            <Button variant="secondary" className="bg-slate-800 text-brand-primary border-none" onClick={() => onAction('chat')}>
               Chat with Ace
             </Button>
           </div>
@@ -807,9 +937,9 @@ const Timetable = ({ onAction }: any) => {
     <div className="flex-1 overflow-y-auto pb-32 p-6">
       <div className="flex justify-between items-center mb-8">
         <div className="flex items-center gap-2">
-          <button onClick={() => onAction('back')} className="p-2 hover:bg-white/5 rounded-xl"><ArrowLeft size={20} /></button>
+          <button onClick={() => onAction('back')} className="p-2 hover:bg-slate-800/5 rounded-xl"><ArrowLeft size={20} /></button>
           <h2 className="text-2xl font-black">Toodly Planner</h2>
-          <button className="p-2 hover:bg-white/5 rounded-xl"><ChevronRight size={20} /></button>
+          <button className="p-2 hover:bg-slate-800/5 rounded-xl"><ChevronRight size={20} /></button>
         </div>
         <button className="w-10 h-10 bg-bg-card border border-slate-800 rounded-xl flex items-center justify-center">
           <SettingsIcon size={20} />
@@ -945,7 +1075,7 @@ const Settings = ({ user, onAction, onLogout }: any) => {
               <span className="font-bold">Dark Mode</span>
             </div>
             <div className="w-12 h-6 bg-brand-primary rounded-full relative">
-              <div className="absolute right-1 top-1 w-4 h-4 bg-white rounded-full" />
+              <div className="absolute right-1 top-1 w-4 h-4 bg-slate-800 rounded-full" />
             </div>
           </Card>
           <Card className="p-4 flex items-center justify-between">
@@ -954,7 +1084,7 @@ const Settings = ({ user, onAction, onLogout }: any) => {
               <span className="font-bold">Voice Assistance</span>
             </div>
             <div className="w-12 h-6 bg-slate-800 rounded-full relative">
-              <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full" />
+              <div className="absolute left-1 top-1 w-4 h-4 bg-slate-800 rounded-full" />
             </div>
           </Card>
         </div>
@@ -978,8 +1108,8 @@ const EditBuddyModal = ({ profile, onSave, onCancel }: any) => {
   const [isCustomName, setIsCustomName] = useState(profile.buddyType === 'AI' && profile.buddyName !== 'Ace' && !!profile.buddyName);
 
   return (
-    <div className="fixed inset-0 max-w-md mx-auto bg-zinc-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-      <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl">
+    <div className="fixed inset-0 w-full bg-zinc-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+      <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-slate-800 rounded-3xl p-6 w-full lg:max-w-7xl mx-auto shadow-2xl">
         <div className="flex justify-between items-center mb-6">
           <h3 className="text-xl font-bold">Edit Buddy</h3>
           <button onClick={onCancel}><X size={20} /></button>
@@ -987,7 +1117,7 @@ const EditBuddyModal = ({ profile, onSave, onCancel }: any) => {
 
         <div className="space-y-6">
           <div>
-            <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-3">Buddy Type</label>
+            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">Buddy Type</label>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {[
                 { id: 'AI', label: 'AI', icon: Brain },
@@ -1004,7 +1134,7 @@ const EditBuddyModal = ({ profile, onSave, onCancel }: any) => {
                     }
                     setData(newData);
                   }}
-                  className={`p-2 rounded-xl border flex flex-col items-center gap-1 transition-all ${data.buddyType === type.id ? 'border-emerald-600 bg-emerald-50 text-emerald-700 font-bold' : 'border-zinc-100 bg-white'}`}
+                  className={`p-2 rounded-xl border flex flex-col items-center gap-1 transition-all ${data.buddyType === type.id ? 'border-emerald-600 bg-emerald-500/10 text-emerald-700 font-bold' : 'border-slate-700 bg-slate-800'}`}
                 >
                   <type.icon size={16} />
                   <span className="text-[8px]">{type.label}</span>
@@ -1014,20 +1144,20 @@ const EditBuddyModal = ({ profile, onSave, onCancel }: any) => {
           </div>
 
           <div>
-            <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-2">Buddy Name</label>
+            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Buddy Name</label>
             {data.buddyType === 'AI' ? (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-zinc-600">Customize AI Name?</span>
+                  <span className="text-xs text-slate-300">Customize AI Name?</span>
                   <button 
                     onClick={() => {
                       const isCustom = !isCustomName;
                       setIsCustomName(isCustom);
                       if (!isCustom) setData({ ...data, buddyName: 'Ace' });
                     }}
-                    className={`w-10 h-5 rounded-full relative transition-colors ${isCustomName ? 'bg-emerald-600' : 'bg-zinc-200'}`}
+                    className={`w-10 h-5 rounded-full relative transition-colors ${isCustomName ? 'bg-emerald-600' : 'bg-slate-700'}`}
                   >
-                    <div className={`absolute top-1 w-3 h-3 bg-white rounded-full shadow-sm transition-all ${isCustomName ? 'right-1' : 'left-1'}`} />
+                    <div className={`absolute top-1 w-3 h-3 bg-slate-800 rounded-full shadow-sm transition-all ${isCustomName ? 'right-1' : 'left-1'}`} />
                   </button>
                 </div>
                 {isCustomName && (
@@ -1035,12 +1165,12 @@ const EditBuddyModal = ({ profile, onSave, onCancel }: any) => {
                     type="text" 
                     value={data.buddyName}
                     onChange={(e) => setData({ ...data, buddyName: e.target.value })}
-                    className="w-full p-3 rounded-xl border border-zinc-100 text-sm focus:outline-none focus:border-emerald-600"
+                    className="w-full p-3 rounded-xl border border-slate-700 text-sm focus:outline-none focus:border-emerald-600"
                     placeholder="Enter custom AI name..."
                   />
                 )}
                 {!isCustomName && (
-                  <div className="p-3 bg-zinc-50 rounded-xl border border-zinc-100 text-sm text-zinc-500">
+                  <div className="p-3 bg-slate-900 rounded-xl border border-slate-700 text-sm text-slate-400">
                     Ace (Default)
                   </div>
                 )}
@@ -1050,7 +1180,7 @@ const EditBuddyModal = ({ profile, onSave, onCancel }: any) => {
                 type="text" 
                 value={data.buddyName}
                 onChange={(e) => setData({ ...data, buddyName: e.target.value })}
-                className="w-full p-3 rounded-xl border border-zinc-100 text-sm focus:outline-none focus:border-emerald-600"
+                className="w-full p-3 rounded-xl border border-slate-700 text-sm focus:outline-none focus:border-emerald-600"
                 placeholder="Enter buddy name..."
               />
             )}
@@ -1059,13 +1189,13 @@ const EditBuddyModal = ({ profile, onSave, onCancel }: any) => {
           {data.buddyType !== 'AI' && (
             <div className="space-y-4">
               <div>
-                <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Listening Rate (1-5)</label>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Listening Rate (1-5)</label>
                 <div className="flex justify-between">
                   {[1, 2, 3, 4, 5].map(num => (
                     <button 
                       key={num}
                       onClick={() => setData({ ...data, buddyRating: num })}
-                      className={`w-8 h-8 rounded-full flex items-center justify-center text-xs border ${data.buddyRating === num ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-zinc-500 border-zinc-100'}`}
+                      className={`w-8 h-8 rounded-full flex items-center justify-center text-xs border ${data.buddyRating === num ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-slate-800 text-slate-400 border-slate-700'}`}
                     >
                       {num}
                     </button>
@@ -1074,18 +1204,18 @@ const EditBuddyModal = ({ profile, onSave, onCancel }: any) => {
               </div>
 
               <div className="flex items-center justify-between">
-                <span className="text-xs text-zinc-600">Always pick calls?</span>
+                <span className="text-xs text-slate-300">Always pick calls?</span>
                 <div className="flex gap-2">
-                  <button onClick={() => setData({ ...data, buddyAlwaysPicksCalls: true })} className={`px-3 py-1 rounded-lg text-[10px] border ${data.buddyAlwaysPicksCalls ? 'bg-emerald-600 text-white' : 'bg-white text-zinc-500'}`}>Yes</button>
-                  <button onClick={() => setData({ ...data, buddyAlwaysPicksCalls: false })} className={`px-3 py-1 rounded-lg text-[10px] border ${!data.buddyAlwaysPicksCalls ? 'bg-emerald-600 text-white' : 'bg-white text-zinc-500'}`}>No</button>
+                  <button onClick={() => setData({ ...data, buddyAlwaysPicksCalls: true })} className={`px-3 py-1 rounded-lg text-[10px] border ${data.buddyAlwaysPicksCalls ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400'}`}>Yes</button>
+                  <button onClick={() => setData({ ...data, buddyAlwaysPicksCalls: false })} className={`px-3 py-1 rounded-lg text-[10px] border ${!data.buddyAlwaysPicksCalls ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400'}`}>No</button>
                 </div>
               </div>
 
               <div className="flex items-center justify-between">
-                <span className="text-xs text-zinc-600">Cares about studies?</span>
+                <span className="text-xs text-slate-300">Cares about studies?</span>
                 <div className="flex gap-2">
-                  <button onClick={() => setData({ ...data, buddyCaresAboutStudies: true })} className={`px-3 py-1 rounded-lg text-[10px] border ${data.buddyCaresAboutStudies ? 'bg-emerald-600 text-white' : 'bg-white text-zinc-500'}`}>Yes</button>
-                  <button onClick={() => setData({ ...data, buddyCaresAboutStudies: false })} className={`px-3 py-1 rounded-lg text-[10px] border ${!data.buddyCaresAboutStudies ? 'bg-emerald-600 text-white' : 'bg-white text-zinc-500'}`}>No</button>
+                  <button onClick={() => setData({ ...data, buddyCaresAboutStudies: true })} className={`px-3 py-1 rounded-lg text-[10px] border ${data.buddyCaresAboutStudies ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400'}`}>Yes</button>
+                  <button onClick={() => setData({ ...data, buddyCaresAboutStudies: false })} className={`px-3 py-1 rounded-lg text-[10px] border ${!data.buddyCaresAboutStudies ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400'}`}>No</button>
                 </div>
               </div>
             </div>
@@ -1169,20 +1299,20 @@ const ExamPractice = ({ onCancel, onComplete, setToast }: { onCancel: () => void
     const hasAnswered = userAnswers[currentIdx] !== null;
 
     return (
-      <div className="fixed inset-0 max-w-md mx-auto bg-zinc-50 z-[110] flex flex-col p-6 overflow-y-auto">
+      <div className="fixed inset-0 w-full bg-slate-900 z-[110] flex flex-col p-6 overflow-y-auto">
         <div className="flex justify-between items-center mb-8">
           <div>
             <Badge color="violet">{q.examType} Practice</Badge>
             <h3 className="text-lg font-bold mt-1">{q.subject} {q.year ? `(${q.year})` : ''}</h3>
           </div>
-          <button onClick={onCancel} className="p-2 hover:bg-zinc-100 rounded-full transition-colors flex items-center gap-2 text-zinc-500 font-bold text-xs">
+          <button onClick={onCancel} className="p-2 hover:bg-slate-800 rounded-full transition-colors flex items-center gap-2 text-slate-400 font-bold text-xs">
             <X size={20} /> Quit
           </button>
         </div>
 
         <div className="flex-1 max-w-2xl mx-auto w-full pb-32">
           <div className="flex justify-between items-center mb-4">
-            <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Question {currentIdx + 1} of {questions.length}</p>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Question {currentIdx + 1} of {questions.length}</p>
             <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">Score: {score}</p>
           </div>
 
@@ -1190,9 +1320,9 @@ const ExamPractice = ({ onCancel, onComplete, setToast }: { onCancel: () => void
           
           <div className="space-y-3">
             {q.options.map((opt, idx) => {
-              let style = "border-zinc-100";
+              let style = "border-slate-700";
               if (hasAnswered) {
-                if (idx === q.correctAnswer) style = "border-emerald-500 bg-emerald-50 text-emerald-700";
+                if (idx === q.correctAnswer) style = "border-emerald-500 bg-emerald-500/10 text-emerald-700";
                 else if (idx === userAnswers[currentIdx]) style = "border-red-500 bg-red-50 text-red-700";
                 else style = "opacity-50";
               }
@@ -1202,9 +1332,9 @@ const ExamPractice = ({ onCancel, onComplete, setToast }: { onCancel: () => void
                   key={idx}
                   disabled={hasAnswered}
                   onClick={() => handleAnswer(idx)}
-                  className={`w-full p-4 text-left rounded-2xl border transition-all flex items-center gap-4 ${style} ${!hasAnswered ? 'hover:border-emerald-600 hover:bg-emerald-50' : ''}`}
+                  className={`w-full p-4 text-left rounded-2xl border transition-all flex items-center gap-4 ${style} ${!hasAnswered ? 'hover:border-emerald-600 hover:bg-emerald-500/10' : ''}`}
                 >
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold ${hasAnswered && idx === q.correctAnswer ? 'bg-emerald-600 text-white' : 'bg-zinc-50 text-zinc-500'}`}>
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold ${hasAnswered && idx === q.correctAnswer ? 'bg-emerald-600 text-white' : 'bg-slate-900 text-slate-400'}`}>
                     {String.fromCharCode(65 + idx)}
                   </div>
                   <span className="font-medium">{opt}</span>
@@ -1214,14 +1344,14 @@ const ExamPractice = ({ onCancel, onComplete, setToast }: { onCancel: () => void
           </div>
 
           {showExplanation && (
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-8 p-4 bg-zinc-50 rounded-2xl border border-zinc-100">
-              <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Explanation</p>
-              <p className="text-sm text-zinc-600 leading-relaxed">{q.explanation}</p>
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-8 p-4 bg-slate-900 rounded-2xl border border-slate-700">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Explanation</p>
+              <p className="text-sm text-slate-300 leading-relaxed">{q.explanation}</p>
             </motion.div>
           )}
         </div>
 
-        <div className="fixed bottom-0 max-w-md mx-auto w-full p-6 bg-white border-t border-zinc-100 flex gap-3">
+        <div className="fixed bottom-0 w-full lg:max-w-7xl mx-auto p-6 bg-slate-800 border-t border-slate-700 flex gap-3">
           <Button variant="secondary" className="flex-1" onClick={prevQuestion} disabled={currentIdx === 0} icon={ArrowLeft}>Back</Button>
           <Button className="flex-1" onClick={nextQuestion} icon={ChevronRight}>
             {currentIdx === questions.length - 1 ? 'Finish' : 'Next'}
@@ -1233,12 +1363,12 @@ const ExamPractice = ({ onCancel, onComplete, setToast }: { onCancel: () => void
 
   if (finished) {
     return (
-      <div className="fixed inset-0 max-w-md mx-auto bg-white z-[110] flex flex-col items-center justify-center p-6 text-center">
+      <div className="fixed inset-0 w-full bg-slate-800 z-[110] flex flex-col items-center justify-center p-6 text-center">
         <div className="w-20 h-20 bg-emerald-100 rounded-3xl flex items-center justify-center text-emerald-600 mb-6">
           <Award size={40} />
         </div>
         <h2 className="text-3xl font-bold mb-2">Practice Complete!</h2>
-        <p className="text-zinc-500 mb-8">You scored {score} out of {questions.length}</p>
+        <p className="text-slate-400 mb-8">You scored {score} out of {questions.length}</p>
         <div className="flex gap-3 w-full max-w-xs">
           <Button className="flex-1" onClick={() => { setQuestions([]); setFinished(false); }}>Retry</Button>
           <Button variant="secondary" className="flex-1" onClick={() => onComplete(score, questions.length, questions[0].subject, questions[0].examType)}>Finish</Button>
@@ -1248,7 +1378,7 @@ const ExamPractice = ({ onCancel, onComplete, setToast }: { onCancel: () => void
   }
 
   return (
-    <div className="fixed inset-0 max-w-md mx-auto bg-white z-[110] flex flex-col p-6 overflow-y-auto">
+    <div className="fixed inset-0 w-full bg-slate-800 z-[110] flex flex-col p-6 overflow-y-auto">
       <div className="flex justify-between items-center mb-8">
         <div className="flex items-center gap-3">
           {(selectedExamType || selectedSubject) && (
@@ -1257,47 +1387,47 @@ const ExamPractice = ({ onCancel, onComplete, setToast }: { onCancel: () => void
                 if (selectedSubject) setSelectedSubject(null);
                 else if (selectedExamType) setSelectedExamType(null);
               }}
-              className="p-2 hover:bg-zinc-100 rounded-full transition-colors"
+              className="p-2 hover:bg-slate-800 rounded-full transition-colors"
             >
               <ArrowLeft size={20} />
             </button>
           )}
           <h2 className="text-2xl font-bold tracking-tight">Exam Practice</h2>
         </div>
-        <button onClick={onCancel} className="p-2 hover:bg-zinc-100 rounded-full transition-colors">
+        <button onClick={onCancel} className="p-2 hover:bg-slate-800 rounded-full transition-colors">
           <X size={20} />
         </button>
       </div>
 
-      <div className="space-y-8 max-w-md mx-auto w-full pb-12">
+      <div className="space-y-8 w-full lg:max-w-7xl mx-auto pb-12">
         {!selectedExamType ? (
           <div>
-            <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3">Select Exam Type</label>
+            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Select Exam Type</label>
             <div className="grid grid-cols-1 gap-2">
               {examTypes.map(type => (
                 <button 
                   key={type}
                   onClick={() => setSelectedExamType(type)}
-                  className="p-4 rounded-2xl border border-zinc-100 text-left hover:border-emerald-600 hover:bg-emerald-50 transition-all flex justify-between items-center"
+                  className="p-4 rounded-2xl border border-slate-700 text-left hover:border-emerald-600 hover:bg-emerald-500/10 transition-all flex justify-between items-center"
                 >
                   <span className="font-bold">{type}</span>
-                  <ChevronRight size={18} className="text-zinc-500" />
+                  <ChevronRight size={18} className="text-slate-400" />
                 </button>
               ))}
             </div>
           </div>
         ) : !selectedSubject ? (
           <div>
-            <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3">Select Subject for {selectedExamType}</label>
+            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Select Subject for {selectedExamType}</label>
             <div className="grid grid-cols-1 gap-2">
               {subjects.map(s => (
                 <button 
                   key={s}
                   onClick={() => setSelectedSubject(s)}
-                  className="p-4 rounded-2xl border border-zinc-100 text-left hover:border-emerald-600 hover:bg-emerald-50 transition-all flex justify-between items-center"
+                  className="p-4 rounded-2xl border border-slate-700 text-left hover:border-emerald-600 hover:bg-emerald-500/10 transition-all flex justify-between items-center"
                 >
                   <span className="font-bold">{s}</span>
-                  <ChevronRight size={18} className="text-zinc-500" />
+                  <ChevronRight size={18} className="text-slate-400" />
                 </button>
               ))}
             </div>
@@ -1305,11 +1435,11 @@ const ExamPractice = ({ onCancel, onComplete, setToast }: { onCancel: () => void
         ) : (
           <>
             <div>
-              <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3">Select Year (Optional)</label>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Select Year (Optional)</label>
               <div className="flex flex-wrap gap-2">
                 <button 
                   onClick={() => setSelectedYear(null)}
-                  className={`px-4 py-2 rounded-xl border text-sm transition-all ${selectedYear === null ? 'border-emerald-600 bg-emerald-50 font-bold' : 'border-zinc-100'}`}
+                  className={`px-4 py-2 rounded-xl border text-sm transition-all ${selectedYear === null ? 'border-emerald-600 bg-emerald-500/10 font-bold' : 'border-slate-700'}`}
                 >
                   All Years
                 </button>
@@ -1317,7 +1447,7 @@ const ExamPractice = ({ onCancel, onComplete, setToast }: { onCancel: () => void
                   <button 
                     key={y}
                     onClick={() => setSelectedYear(y as number)}
-                    className={`px-4 py-2 rounded-xl border text-sm transition-all ${selectedYear === y ? 'border-emerald-600 bg-emerald-50 font-bold' : 'border-zinc-100'}`}
+                    className={`px-4 py-2 rounded-xl border text-sm transition-all ${selectedYear === y ? 'border-emerald-600 bg-emerald-500/10 font-bold' : 'border-slate-700'}`}
                   >
                     {y}
                   </button>
@@ -1325,7 +1455,7 @@ const ExamPractice = ({ onCancel, onComplete, setToast }: { onCancel: () => void
               </div>
             </div>
 
-            <div className="p-6 bg-emerald-50 rounded-3xl border border-emerald-100">
+            <div className="p-6 bg-emerald-500/10 rounded-3xl border border-emerald-100">
               <h4 className="font-bold text-emerald-900 mb-2">Ready to start?</h4>
               <p className="text-sm text-emerald-700 mb-4">You'll be practicing {selectedSubject} for {selectedExamType}. Ace will pick 10 questions for you.</p>
               <Button className="w-full py-3.5 text-base" onClick={startPractice} icon={Play}>
@@ -1466,7 +1596,7 @@ const BuddyChatModal = ({ user, profile, onClose, initialMessage, isAI: propIsAI
   };
 
   return (
-    <div className="fixed inset-0 max-w-md mx-auto bg-black/60 backdrop-blur-sm z-[200] flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div className="fixed inset-0 w-full bg-black/60 backdrop-blur-sm z-[200] flex items-end sm:items-center justify-center p-0 sm:p-4">
       <motion.div 
         initial={{ y: '100%' }} 
         animate={{ y: 0 }} 
@@ -1476,10 +1606,10 @@ const BuddyChatModal = ({ user, profile, onClose, initialMessage, isAI: propIsAI
         {/* WhatsApp Style Header */}
         <div className="p-4 bg-[#075E54] text-white flex justify-between items-center shadow-md">
           <div className="flex items-center gap-3">
-            <button onClick={onClose} className="p-1 -ml-1 hover:bg-white/10 rounded-full sm:hidden">
+            <button onClick={onClose} className="p-1 -ml-1 hover:bg-slate-800/10 rounded-full sm:hidden">
               <ArrowLeft size={20} />
             </button>
-            <div className="w-10 h-10 rounded-full bg-zinc-200 flex items-center justify-center text-zinc-600 font-bold overflow-hidden">
+            <div className="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center text-slate-300 font-bold overflow-hidden">
               {isAI ? <Brain size={24} className="text-emerald-600" /> : (buddyName?.[0] || 'B')}
             </div>
             <div>
@@ -1488,8 +1618,8 @@ const BuddyChatModal = ({ user, profile, onClose, initialMessage, isAI: propIsAI
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <button className="p-2 hover:bg-white/10 rounded-full"><Plus size={20} /></button>
-            <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full"><X size={20} /></button>
+            <button className="p-2 hover:bg-slate-800/10 rounded-full"><Plus size={20} /></button>
+            <button onClick={onClose} className="p-2 hover:bg-slate-800/10 rounded-full"><X size={20} /></button>
           </div>
         </div>
 
@@ -1504,12 +1634,12 @@ const BuddyChatModal = ({ user, profile, onClose, initialMessage, isAI: propIsAI
               <div key={i} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
                 <div className={`max-w-[85%] px-3 py-2 rounded-lg text-sm shadow-sm relative ${
                   isMe 
-                    ? 'bg-[#DCF8C6] text-zinc-900 rounded-tr-none' 
-                    : 'bg-white text-zinc-900 rounded-tl-none'
+                    ? 'bg-[#DCF8C6] text-white rounded-tr-none' 
+                    : 'bg-slate-800 text-white rounded-tl-none'
                 }`}>
                   <p className="pr-12">{msg.text}</p>
                   <div className="absolute bottom-1 right-2 flex items-center gap-1">
-                    <span className="text-[9px] text-zinc-400">
+                    <span className="text-[9px] text-slate-500">
                       {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
                     {isMe && (
@@ -1525,7 +1655,7 @@ const BuddyChatModal = ({ user, profile, onClose, initialMessage, isAI: propIsAI
           })}
           {loading && (
             <div className="flex justify-start">
-              <div className="bg-white px-3 py-2 rounded-lg rounded-tl-none shadow-sm">
+              <div className="bg-slate-800 px-3 py-2 rounded-lg rounded-tl-none shadow-sm">
                 <div className="flex gap-1">
                   <div className="w-1.5 h-1.5 bg-zinc-300 rounded-full animate-bounce" />
                   <div className="w-1.5 h-1.5 bg-zinc-300 rounded-full animate-bounce [animation-delay:0.2s]" />
@@ -1538,7 +1668,7 @@ const BuddyChatModal = ({ user, profile, onClose, initialMessage, isAI: propIsAI
 
         {/* WhatsApp Style Input Area */}
         <div className="p-3 bg-[#F0F0F0] flex items-center gap-2">
-          <button className="p-2 text-zinc-500 hover:text-zinc-700 transition-colors">
+          <button className="p-2 text-slate-400 hover:text-slate-300 transition-colors">
             <Plus size={24} />
           </button>
           <div className="flex-1 relative">
@@ -1548,7 +1678,7 @@ const BuddyChatModal = ({ user, profile, onClose, initialMessage, isAI: propIsAI
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSend()}
               placeholder="Type a message"
-              className="w-full py-2.5 px-4 bg-white rounded-full text-sm text-zinc-900 focus:outline-none shadow-sm"
+              className="w-full py-2.5 px-4 bg-slate-800 rounded-full text-sm text-white focus:outline-none shadow-sm"
             />
           </div>
           <button 
@@ -1590,6 +1720,10 @@ export default function App() {
     }
     if (showBuddyEdit) {
       setShowBuddyEdit(false);
+      return;
+    }
+    if (showPublicProfile) {
+      setShowPublicProfile(false);
       return;
     }
     if (showAbout) {
@@ -1655,6 +1789,13 @@ export default function App() {
   const [isSignUp, setIsSignUp] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [notificationsData, setNotificationsData] = useState([
+    { id: '1', title: 'New Quiz!', desc: 'Math quiz is ready for you', time: '2m ago', icon: 'zap', color: 'amber', read: false },
+    { id: '2', title: 'Emma challenged you!', desc: 'Quiz battle in Physics', time: '1h ago', icon: 'users', color: 'rose', read: false },
+    { id: '3', title: 'Math Result', desc: 'You scored 85% in Algebra', time: '3h ago', icon: 'award', color: 'emerald', read: true },
+  ]);
+  const hasUnreadNotifications = notificationsData.some(n => !n.read);
+  const [showPublicProfile, setShowPublicProfile] = useState(false);
   const [showDailyGoals, setShowDailyGoals] = useState(false);
   const [showStudyGroups, setShowStudyGroups] = useState(false);
   const [showQuizBattle, setShowQuizBattle] = useState(false);
@@ -1677,7 +1818,24 @@ export default function App() {
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showForgotPasswordModal, setShowForgotPasswordModal] = useState(false);
+  const [hasSeenPreAuth, setHasSeenPreAuth] = useState(() => {
+    return localStorage.getItem('hasSeenPreAuth') === 'true';
+  });
   const [showSplash, setShowSplash] = useState(true);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => setShowSplash(false), 2500);
@@ -1984,6 +2142,7 @@ export default function App() {
       setActiveSession(null);
       setTimer(25 * 60);
       setIsFocusMode(false);
+      setToast({ title: 'Session Saved', message: 'Your progress has been recorded.', type: 'success' });
     } catch (error) {
       try {
         handleFirestoreError(error, OperationType.CREATE, 'studySessions');
@@ -2435,7 +2594,7 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="max-w-md mx-auto min-h-screen flex flex-col items-center justify-center bg-zinc-50 p-6 relative shadow-2xl border-x border-zinc-200 overflow-x-hidden">
+      <div className="w-full lg:max-w-7xl mx-auto min-h-screen flex flex-col items-center justify-center bg-slate-900 p-6 relative shadow-2xl border-x border-slate-600 overflow-x-hidden">
         <motion.div 
           animate={{ rotate: 360 }}
           transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
@@ -2443,11 +2602,11 @@ export default function App() {
         >
           <RefreshCw className="text-emerald-600" size={48} />
         </motion.div>
-        <h2 className="text-xl font-bold text-zinc-900 mb-2">Loading Study Buddy...</h2>
-        <p className="text-zinc-500 text-center max-w-xs">
+        <h2 className="text-xl font-bold text-white mb-2">Loading Study Buddy...</h2>
+        <p className="text-slate-400 text-center max-w-xs">
           {!isAuthReady ? "Initializing authentication..." : "Fetching your profile..."}
         </p>
-        <div className="mt-8 text-xs text-zinc-400">
+        <div className="mt-8 text-xs text-slate-500">
           Status: {JSON.stringify({ isAuthReady, hasUser: !!user, hasProfile: !!profile })}
         </div>
       </div>
@@ -2455,8 +2614,17 @@ export default function App() {
   }
 
   if (!user) {
+    if (!hasSeenPreAuth) {
+      return (
+        <PreAuthOnboarding onComplete={() => {
+          setHasSeenPreAuth(true);
+          localStorage.setItem('hasSeenPreAuth', 'true');
+        }} />
+      );
+    }
+
     return (
-      <div className="max-w-md mx-auto min-h-screen bg-zinc-50 flex flex-col items-center justify-center p-6 text-center relative shadow-2xl border-x border-zinc-200 overflow-x-hidden">
+      <div className="w-full lg:max-w-7xl mx-auto min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-center relative shadow-2xl border-x border-slate-600 overflow-x-hidden">
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -2465,8 +2633,8 @@ export default function App() {
           <div className="w-20 h-20 bg-emerald-600 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-xl shadow-emerald-200">
             <GraduationCap className="text-white" size={40} />
           </div>
-          <h1 className="text-4xl font-bold text-zinc-900 mb-4 tracking-tight">Study Buddy</h1>
-          <p className="text-zinc-600 mb-10 text-lg">
+          <h1 className="text-4xl font-bold text-white mb-4 tracking-tight">Study Buddy</h1>
+          <p className="text-slate-300 mb-10 text-lg">
             Your intelligent companion for academic excellence and balanced well-being.
           </p>
           
@@ -2474,24 +2642,24 @@ export default function App() {
             <h2 className="text-xl font-bold mb-4">{isSignUp ? 'Create Account' : 'Welcome Back'}</h2>
             <form onSubmit={handleEmailAuth} className="space-y-4">
               <div>
-                <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Email Address</label>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Email Address</label>
                 <input 
                   type="email" 
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="name@example.com"
-                  className="w-full p-3 rounded-xl border border-zinc-100 text-sm focus:outline-none focus:border-emerald-600"
+                  className="w-full p-3 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
                   required
                 />
               </div>
               <div>
                 <div className="flex justify-between items-center mb-2">
-                  <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Password</label>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest">Password</label>
                   {!isSignUp && (
                     <button 
                       type="button"
                       onClick={() => setShowForgotPasswordModal(true)}
-                      className="text-[10px] font-bold text-emerald-600 hover:underline"
+                      className="text-[10px] font-bold text-emerald-500 hover:underline"
                     >
                       Forgot?
                     </button>
@@ -2502,12 +2670,12 @@ export default function App() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full p-3 rounded-xl border border-zinc-100 text-sm focus:outline-none focus:border-emerald-600"
+                  className="w-full p-3 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
                   required
                 />
               </div>
               {authError && (
-                <p className="text-xs text-red-500 font-medium">{authError}</p>
+                <p className="text-xs text-rose-500 font-medium">{authError}</p>
               )}
               <Button type="submit" className="w-full py-3" disabled={loading}>
                 {loading ? 'Processing...' : (isSignUp ? 'Sign Up' : 'Sign In')}
@@ -2522,7 +2690,7 @@ export default function App() {
             {isSignUp ? 'Already have an account? Sign In' : "Don't have an account? Sign Up"}
           </button>
 
-          <p className="mt-8 text-xs text-zinc-400 uppercase tracking-widest font-bold">
+          <p className="mt-8 text-xs text-slate-500 uppercase tracking-widest font-bold">
             Designed for African Students
           </p>
         </motion.div>
@@ -2541,14 +2709,21 @@ export default function App() {
       <AnimatePresence>
         {showSplash && <SplashScreen />}
       </AnimatePresence>
-      <div className={`max-w-md mx-auto min-h-screen bg-zinc-50 pb-24 pt-20 relative shadow-2xl border-x border-zinc-200 overflow-x-hidden ${accessibilitySettings.highContrast ? 'contrast-125' : ''} ${accessibilitySettings.largeText ? 'text-lg' : ''}`}>
+      <div className={`w-full lg:max-w-7xl mx-auto min-h-screen bg-slate-900 pb-24 pt-20 relative shadow-2xl border-x border-slate-600 overflow-x-hidden ${accessibilitySettings.highContrast ? 'contrast-125' : ''} ${accessibilitySettings.largeText ? 'text-lg' : ''}`}>
+      
+      {!isOnline && (
+        <div className="fixed top-0 w-full lg:max-w-7xl mx-auto bg-rose-500 text-white text-xs font-bold text-center py-1 z-50">
+          You are currently offline
+        </div>
+      )}
+
       {/* Top Bar / Quick Menu */}
-      <header className="fixed top-0 w-full max-w-md h-16 bg-white/90 backdrop-blur-md border-b border-zinc-100 z-40 flex items-center justify-between px-6 shadow-sm">
+      <header className={`fixed ${!isOnline ? 'top-6' : 'top-0'} w-full lg:max-w-7xl mx-auto h-16 bg-slate-800/90 backdrop-blur-md border-b border-slate-700 z-40 flex items-center justify-between px-6 shadow-sm transition-all`}>
         <div className="flex items-center gap-3">
           {(activeTab !== 'dashboard' && (tabHistory.length > 0 || activeQuiz || showExamPractice || showBuddyEdit || showAbout || showChangePasswordModal || isChatOpen || isFocusMode)) && (
             <button 
               onClick={handleBack}
-              className="p-2 -ml-2 text-zinc-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
+              className="p-2 -ml-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-500/10 rounded-xl transition-all"
               title="Go Back"
             >
               <ArrowLeft size={20} />
@@ -2561,12 +2736,15 @@ export default function App() {
         </div>
         <div className="flex items-center gap-2">
           <button 
-            onClick={() => navigate('notifications')}
-            className="p-2 text-zinc-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all relative"
+            onClick={() => {
+              navigate('notifications');
+              setNotificationsData(notificationsData.map(n => ({ ...n, read: true })));
+            }}
+            className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-500/10 rounded-xl transition-all relative"
             title="Notifications"
           >
             <Bell size={20} />
-            <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full border-2 border-white"></span>
+            {hasUnreadNotifications && <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full border-2 border-white"></span>}
           </button>
           <button 
             onClick={() => {
@@ -2584,21 +2762,21 @@ export default function App() {
                 setIsFocusMode(true);
               }
             }}
-            className="p-2 text-zinc-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
+            className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-500/10 rounded-xl transition-all"
             title="Quick Focus Timer"
           >
             <Timer size={20} />
           </button>
           <button 
             onClick={() => setShowAbout(true)}
-            className="p-2 text-zinc-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
+            className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-500/10 rounded-xl transition-all"
             title="About App"
           >
             <Info size={20} />
           </button>
           <button 
             onClick={() => navigate('settings')}
-            className="p-2 text-zinc-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
+            className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-500/10 rounded-xl transition-all"
             title="Settings"
           >
             <SettingsIcon size={20} />
@@ -2607,7 +2785,7 @@ export default function App() {
       </header>
 
       {/* Bottom Nav (Mobile Form) */}
-      <nav className="fixed bottom-0 w-full max-w-md bg-white/95 backdrop-blur-md border-t border-zinc-100 px-4 py-2 pb-[env(safe-area-inset-bottom,12px)] flex justify-around items-center z-50 shadow-[0_-4px_20px_rgba(0,0,0,0.03)]">
+      <nav className="fixed bottom-0 w-full lg:max-w-7xl mx-auto bg-slate-800/95 backdrop-blur-md border-t border-slate-700 px-4 py-2 pb-[env(safe-area-inset-bottom,12px)] flex justify-around items-center z-50 shadow-[0_-4px_20px_rgba(0,0,0,0.03)]">
         <div className="flex gap-1 w-full">
           <NavButton active={activeTab === 'dashboard'} onClick={() => navigate('dashboard')} icon={LayoutDashboard} label="Home" />
           <NavButton active={activeTab === 'practice'} onClick={() => navigate('practice')} icon={BookOpen} label="Practice" />
@@ -2631,9 +2809,9 @@ export default function App() {
               </div>
               <div className="flex-1">
                 <p className="font-bold text-sm">{toast.title}</p>
-                <p className="text-xs text-zinc-400">{toast.message}</p>
+                <p className="text-xs text-slate-500">{toast.message}</p>
               </div>
-              <button onClick={() => setToast(null)} className="text-zinc-500 hover:text-white">
+              <button onClick={() => setToast(null)} className="text-slate-400 hover:text-white">
                 <X size={16} />
               </button>
             </div>
@@ -2643,6 +2821,18 @@ export default function App() {
       {/* Main Content */}
       <main className="p-6 w-full">
         <AnimatePresence mode="wait">
+          {showPublicProfile && (
+            <motion.div 
+              key="publicProfile"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="absolute inset-0 z-50 bg-slate-900"
+            >
+              <PublicProfile profile={profile} user={user} onAction={handleBack} />
+            </motion.div>
+          )}
+
           {activeTab === 'dashboard' && (
             <motion.div 
               key="dashboard"
@@ -2654,12 +2844,12 @@ export default function App() {
               {/* Header */}
               <header className="flex justify-between items-end">
                 <div>
-                  <h2 className="text-3xl font-bold text-zinc-900 tracking-tight">Good morning, {(profile?.displayName || user?.displayName || user?.email?.split('@')[0] || 'Student').split(' ')[0]}!</h2>
-                  <p className="text-zinc-500 mt-1">Ready to crush your goals today?</p>
+                  <h2 className="text-3xl font-bold text-white tracking-tight">Good morning, {(profile?.displayName || user?.displayName || user?.email?.split('@')[0] || 'Student').split(' ')[0]}!</h2>
+                  <p className="text-slate-400 mt-1">Ready to crush your goals today?</p>
                 </div>
                 <div className="hidden sm:flex gap-3">
                   <div className="text-right">
-                    <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Current Streak</p>
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Current Streak</p>
                     <p className="text-xl font-bold text-emerald-600 flex items-center justify-end gap-1">
                       <Zap size={20} fill="currentColor" /> 12 Days
                     </p>
@@ -2669,23 +2859,23 @@ export default function App() {
 
               {/* Quick Actions Grid */}
               <div className="grid grid-cols-3 gap-4">
-                <button onClick={() => navigate('friends')} className="flex flex-col items-center gap-2 p-4 bg-white rounded-3xl border border-zinc-100 hover:border-emerald-200 transition-all group">
-                  <div className="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600 group-hover:scale-110 transition-transform">
+                <button onClick={() => navigate('friends')} className="flex flex-col items-center gap-2 p-4 bg-slate-800 rounded-3xl border border-slate-700 hover:border-emerald-200 transition-all group">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-600 group-hover:scale-110 transition-transform">
                     <Users size={24} />
                   </div>
-                  <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Friends</span>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Friends</span>
                 </button>
-                <button onClick={() => navigate('chat')} className="flex flex-col items-center gap-2 p-4 bg-white rounded-3xl border border-zinc-100 hover:border-emerald-200 transition-all group">
-                  <div className="w-12 h-12 rounded-2xl bg-violet-50 flex items-center justify-center text-violet-600 group-hover:scale-110 transition-transform">
+                <button onClick={() => navigate('chat')} className="flex flex-col items-center gap-2 p-4 bg-slate-800 rounded-3xl border border-slate-700 hover:border-emerald-200 transition-all group">
+                  <div className="w-12 h-12 rounded-2xl bg-violet-500/10 flex items-center justify-center text-violet-600 group-hover:scale-110 transition-transform">
                     <MessageSquare size={24} />
                   </div>
-                  <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Chat</span>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Chat</span>
                 </button>
-                <button onClick={() => navigate('achievements')} className="flex flex-col items-center gap-2 p-4 bg-white rounded-3xl border border-zinc-100 hover:border-emerald-200 transition-all group">
-                  <div className="w-12 h-12 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-600 group-hover:scale-110 transition-transform">
+                <button onClick={() => navigate('achievements')} className="flex flex-col items-center gap-2 p-4 bg-slate-800 rounded-3xl border border-slate-700 hover:border-emerald-200 transition-all group">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-500/10 flex items-center justify-center text-amber-600 group-hover:scale-110 transition-transform">
                     <Award size={24} />
                   </div>
-                  <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Awards</span>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Awards</span>
                 </button>
               </div>
 
@@ -2699,7 +2889,7 @@ export default function App() {
                   <div className="flex items-center gap-6 mb-6">
                     <div className="relative w-20 h-20">
                       <svg className="w-full h-full" viewBox="0 0 36 36">
-                        <path className="text-zinc-100" strokeDasharray="100, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3" />
+                        <path className="text-slate-100" strokeDasharray="100, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3" />
                         <path className="text-emerald-500" strokeDasharray="65, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3" />
                       </svg>
                       <div className="absolute inset-0 flex items-center justify-center">
@@ -2716,8 +2906,8 @@ export default function App() {
                         <span className="text-xs font-medium">Physics Revision</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-zinc-200" />
-                        <span className="text-xs font-medium text-zinc-400">English Essay</span>
+                        <div className="w-2 h-2 rounded-full bg-slate-700" />
+                        <span className="text-xs font-medium text-slate-500">English Essay</span>
                       </div>
                     </div>
                   </div>
@@ -2732,21 +2922,21 @@ export default function App() {
                     <button onClick={() => navigate('groups')} className="text-xs font-bold text-emerald-600 hover:underline">Join More</button>
                   </div>
                   <div className="space-y-4 flex-1">
-                    <div className="flex items-center gap-3 p-3 bg-zinc-50 rounded-2xl border border-zinc-100">
+                    <div className="flex items-center gap-3 p-3 bg-slate-900 rounded-2xl border border-slate-700">
                       <div className="w-10 h-10 rounded-xl bg-violet-100 text-violet-600 flex items-center justify-center text-xl">⚛️</div>
                       <div className="flex-1">
                         <p className="text-sm font-bold">Physics Squad</p>
-                        <p className="text-[10px] text-zinc-500">12 members online</p>
+                        <p className="text-[10px] text-slate-400">12 members online</p>
                       </div>
-                      <button className="p-2 text-zinc-400 hover:text-emerald-600"><ChevronRight size={16} /></button>
+                      <button className="p-2 text-slate-500 hover:text-emerald-600"><ChevronRight size={16} /></button>
                     </div>
-                    <div className="flex items-center gap-3 p-3 bg-zinc-50 rounded-2xl border border-zinc-100">
+                    <div className="flex items-center gap-3 p-3 bg-slate-900 rounded-2xl border border-slate-700">
                       <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center text-xl">📐</div>
                       <div className="flex-1">
                         <p className="text-sm font-bold">Math Masters</p>
-                        <p className="text-[10px] text-zinc-500">8 members online</p>
+                        <p className="text-[10px] text-slate-400">8 members online</p>
                       </div>
-                      <button className="p-2 text-zinc-400 hover:text-emerald-600"><ChevronRight size={16} /></button>
+                      <button className="p-2 text-slate-500 hover:text-emerald-600"><ChevronRight size={16} /></button>
                     </div>
                   </div>
                   <Button variant="secondary" className="w-full mt-4" onClick={() => navigate('leaderboard')} icon={TrendingUp}>
@@ -2759,14 +2949,14 @@ export default function App() {
               <Card className="bg-gradient-to-br from-emerald-600 to-emerald-700 text-white border-none relative overflow-hidden">
                 <div className="relative z-10">
                   <div className="flex items-center gap-3 mb-4">
-                    <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center">
+                    <div className="w-10 h-10 rounded-full bg-slate-800/20 backdrop-blur-md flex items-center justify-center">
                       <Brain size={20} />
                     </div>
                     <div className="flex items-center gap-2">
                       <p className="text-xs font-bold text-emerald-100 uppercase tracking-widest">Ace (AI Buddy)</p>
                       <button 
                         onClick={handleReadBuddyMessage}
-                        className="p-1 rounded-full hover:bg-white/20 transition-colors"
+                        className="p-1 rounded-full hover:bg-slate-800/20 transition-colors"
                         title="Read Aloud"
                         aria-label="Read Ace's message aloud"
                       >
@@ -2787,7 +2977,7 @@ export default function App() {
                     <div className="flex gap-2">
                       <Button 
                         variant="secondary" 
-                        className="bg-white/10 border-white/20 text-white hover:bg-white/20 text-xs py-1.5" 
+                        className="bg-slate-800/10 border-white/20 text-white hover:bg-slate-800/20 text-xs py-1.5" 
                         onClick={() => fetchBuddyMessage('tired')}
                         disabled={isBuddyLoading}
                       >
@@ -2795,7 +2985,7 @@ export default function App() {
                       </Button>
                       <Button 
                         variant="secondary" 
-                        className="bg-white/10 border-white/20 text-white hover:bg-white/20 text-xs py-1.5" 
+                        className="bg-slate-800/10 border-white/20 text-white hover:bg-slate-800/20 text-xs py-1.5" 
                         onClick={() => fetchBuddyMessage('excited')}
                         disabled={isBuddyLoading}
                       >
@@ -2812,10 +3002,10 @@ export default function App() {
                   <div>
                     <div className="flex justify-between items-start mb-6">
                       <Badge color="amber">Next Session</Badge>
-                      <Clock size={18} className="text-zinc-400" />
+                      <Clock size={18} className="text-slate-500" />
                     </div>
                     <h3 className="text-2xl font-bold mb-2">Mathematics: Calculus</h3>
-                    <p className="text-zinc-500 mb-6">Scheduled for 10:00 AM — 11:00 AM</p>
+                    <p className="text-slate-400 mb-6">Scheduled for 10:00 AM — 11:00 AM</p>
                   </div>
                   <div className="flex gap-3">
                     <Button className="flex-1" icon={Play} onClick={() => startSession('Mathematics')}>
@@ -2829,20 +3019,20 @@ export default function App() {
 
                 <div className="space-y-6">
                   <Card className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-2xl bg-violet-50 flex items-center justify-center text-violet-600">
+                    <div className="w-12 h-12 rounded-2xl bg-violet-500/10 flex items-center justify-center text-violet-600">
                       <TrendingUp size={24} />
                     </div>
                     <div>
-                      <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Study Hours</p>
+                      <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Study Hours</p>
                       <p className="text-2xl font-bold">24.5h</p>
                     </div>
                   </Card>
                   <Card className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-600">
+                    <div className="w-12 h-12 rounded-2xl bg-amber-500/10 flex items-center justify-center text-amber-600">
                       <Award size={24} />
                     </div>
                     <div>
-                      <p className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Quiz Score</p>
+                      <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Quiz Score</p>
                       <p className="text-2xl font-bold">88%</p>
                     </div>
                   </Card>
@@ -2865,16 +3055,16 @@ export default function App() {
                   <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                     <Sparkles size={20} className="text-emerald-500" /> Study Tips
                   </h3>
-                  <Card className="bg-white border-zinc-100 p-4 hover:border-emerald-200 transition-all cursor-pointer group" onClick={() => navigate('tips')}>
+                  <Card className="bg-slate-800 border-slate-700 p-4 hover:border-emerald-200 transition-all cursor-pointer group" onClick={() => navigate('tips')}>
                     <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600 group-hover:scale-110 transition-transform">
+                      <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-600 group-hover:scale-110 transition-transform">
                         <BookOpen size={24} />
                       </div>
                       <div className="flex-1">
                         <p className="text-sm font-bold">Ace's Tip of the Day</p>
-                        <p className="text-xs text-zinc-600">"Try the Pomodoro technique for better focus."</p>
+                        <p className="text-xs text-slate-300">"Try the Pomodoro technique for better focus."</p>
                       </div>
-                      <ChevronRight size={16} className="text-zinc-300" />
+                      <ChevronRight size={16} className="text-slate-300" />
                     </div>
                   </Card>
                 </section>
@@ -2899,9 +3089,9 @@ export default function App() {
 
               {!currentSchedule || !currentSchedule.blocks || currentSchedule.blocks.length === 0 ? (
                 <Card className="text-center py-12">
-                  <Calendar className="mx-auto text-zinc-200 mb-4" size={48} />
+                  <Calendar className="mx-auto text-slate-200 mb-4" size={48} />
                   <h3 className="text-xl font-bold mb-2">No schedule for today</h3>
-                  <p className="text-zinc-500 mb-6">Let Ace generate a personalized plan for you.</p>
+                  <p className="text-slate-400 mb-6">Let Ace generate a personalized plan for you.</p>
                   <Button onClick={handleGenerateSchedule} icon={Sparkles}>
                     Generate AI Schedule
                   </Button>
@@ -2909,15 +3099,15 @@ export default function App() {
               ) : (
                 <div className="space-y-3">
                   {currentSchedule.blocks.map((block, idx) => (
-                    <div key={idx} className={`flex items-center gap-4 p-4 rounded-2xl border ${block.type === 'Study' ? 'bg-white border-zinc-100' : 'bg-zinc-50 border-transparent opacity-70'}`}>
-                      <div className="w-20 text-sm font-bold text-zinc-400">{block.startTime}</div>
+                    <div key={idx} className={`flex items-center gap-4 p-4 rounded-2xl border ${block.type === 'Study' ? 'bg-slate-800 border-slate-700' : 'bg-slate-900 border-transparent opacity-70'}`}>
+                      <div className="w-20 text-sm font-bold text-slate-500">{block.startTime}</div>
                       <div className={`w-1 h-10 rounded-full ${block.type === 'Study' ? 'bg-emerald-500' : block.type === 'Break' ? 'bg-amber-500' : 'bg-violet-500'}`} />
                       <div className="flex-1">
                         <p className="font-bold">{block.subject}</p>
-                        <p className="text-xs text-zinc-500 uppercase tracking-widest font-bold">{block.type}</p>
+                        <p className="text-xs text-slate-400 uppercase tracking-widest font-bold">{block.type}</p>
                       </div>
                       {block.type === 'Study' && (
-                        <button className="w-8 h-8 rounded-full border border-zinc-200 flex items-center justify-center text-zinc-300 hover:border-emerald-500 hover:text-emerald-500 transition-colors">
+                        <button className="w-8 h-8 rounded-full border border-slate-600 flex items-center justify-center text-slate-300 hover:border-emerald-500 hover:text-emerald-500 transition-colors">
                           <CheckCircle size={20} />
                         </button>
                       )}
@@ -2979,7 +3169,7 @@ export default function App() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
             >
-              <Notifications />
+              <Notifications notifications={notificationsData} onAction={handleBack} />
             </motion.div>
           )}
 
@@ -3051,7 +3241,7 @@ export default function App() {
               <header className="flex justify-between items-end">
                 <div>
                   <h2 className="text-2xl font-bold tracking-tight">Practice Center</h2>
-                  <p className="text-zinc-500">Master your subjects with exam-specific quizzes.</p>
+                  <p className="text-slate-400">Master your subjects with exam-specific quizzes.</p>
                 </div>
                 {profile?.targetExams && profile.targetExams.length > 0 && (
                   <div className="flex gap-2">
@@ -3067,7 +3257,7 @@ export default function App() {
                 <Card className="col-span-full bg-violet-600 text-white border-none p-8 relative overflow-hidden group cursor-pointer" onClick={() => setShowExamPractice(true)}>
                   <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
                     <div className="space-y-4">
-                      <div className="w-16 h-16 rounded-3xl bg-white/20 flex items-center justify-center backdrop-blur-md shadow-xl">
+                      <div className="w-16 h-16 rounded-3xl bg-slate-800/20 flex items-center justify-center backdrop-blur-md shadow-xl">
                         <Award size={32} className="text-white" />
                       </div>
                       <div>
@@ -3085,47 +3275,47 @@ export default function App() {
                         </div>
                       </div>
                     </div>
-                    <Button variant="secondary" className="bg-white text-violet-600 border-none hover:bg-violet-50 px-6 py-3.5 text-base font-bold shadow-lg" icon={Play}>
+                    <Button variant="secondary" className="bg-slate-800 text-violet-600 border-none hover:bg-violet-500/10 px-6 py-3.5 text-base font-bold shadow-lg" icon={Play}>
                       Start Practice
                     </Button>
                   </div>
                   {/* Decorative background elements */}
-                  <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-white/10 rounded-full blur-3xl group-hover:bg-white/20 transition-all duration-500" />
+                  <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-slate-800/10 rounded-full blur-3xl group-hover:bg-slate-800/20 transition-all duration-500" />
                   <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-48 h-48 bg-violet-400/20 rounded-full blur-2xl" />
                 </Card>
 
                 {/* Performance Insights */}
                 {getPerformanceInsights() && (
-                  <Card className="col-span-full bg-zinc-50 border-zinc-100">
-                    <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                  <Card className="col-span-full bg-slate-900 border-slate-700">
+                    <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
                       <TrendingUp size={16} /> Performance Insights
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
-                        <p className="text-xs font-bold text-zinc-500 mb-3 uppercase tracking-wider">Strong Subjects</p>
+                        <p className="text-xs font-bold text-slate-400 mb-3 uppercase tracking-wider">Strong Subjects</p>
                         <div className="space-y-2">
                           {getPerformanceInsights()?.strong.length ? getPerformanceInsights()?.strong.map(i => (
-                            <div key={i.subject} className="flex items-center justify-between p-3 bg-white rounded-xl border border-zinc-100">
+                            <div key={i.subject} className="flex items-center justify-between p-3 bg-slate-800 rounded-xl border border-slate-700">
                               <span className="text-sm font-bold">{i.subject}</span>
                               <Badge color="emerald">{Math.round(i.avgScore)}%</Badge>
                             </div>
-                          )) : <p className="text-xs text-zinc-400 italic">Keep practicing to see insights!</p>}
+                          )) : <p className="text-xs text-slate-500 italic">Keep practicing to see insights!</p>}
                         </div>
                       </div>
                       <div>
-                        <p className="text-xs font-bold text-zinc-500 mb-3 uppercase tracking-wider">Focus Needed</p>
+                        <p className="text-xs font-bold text-slate-400 mb-3 uppercase tracking-wider">Focus Needed</p>
                         <div className="space-y-2">
                           {getPerformanceInsights()?.weak.length ? getPerformanceInsights()?.weak.map(i => (
-                            <div key={i.subject} className="flex items-center justify-between p-3 bg-white rounded-xl border border-zinc-100">
+                            <div key={i.subject} className="flex items-center justify-between p-3 bg-slate-800 rounded-xl border border-slate-700">
                               <span className="text-sm font-bold">{i.subject}</span>
                               <Badge color="amber">{Math.round(i.avgScore)}%</Badge>
                             </div>
-                          )) : <p className="text-xs text-zinc-400 italic">You're doing great across all subjects!</p>}
+                          )) : <p className="text-xs text-slate-500 italic">You're doing great across all subjects!</p>}
                         </div>
                       </div>
                     </div>
                     {getPerformanceInsights()?.weak.length ? (
-                      <div className="mt-6 p-4 bg-amber-50 rounded-2xl border border-amber-100 flex items-center gap-3">
+                      <div className="mt-6 p-4 bg-amber-500/10 rounded-2xl border border-amber-100 flex items-center gap-3">
                         <Sparkles className="text-amber-600" size={20} />
                         <p className="text-xs text-amber-800 font-medium">
                           Ace suggests: You should focus more on <span className="font-bold">{getPerformanceInsights()?.weak[0].subject}</span> this week to improve your score.
@@ -3142,7 +3332,7 @@ export default function App() {
                   return (
                     <Card key={subject} className="group hover:border-emerald-200 transition-all">
                       <div className="flex justify-between items-start mb-4">
-                        <div className="w-12 h-12 rounded-2xl bg-zinc-50 flex items-center justify-center text-zinc-400 group-hover:bg-emerald-50 group-hover:text-emerald-600 transition-colors">
+                        <div className="w-12 h-12 rounded-2xl bg-slate-900 flex items-center justify-center text-slate-500 group-hover:bg-emerald-500/10 group-hover:text-emerald-600 transition-colors">
                           <BookOpen size={24} />
                         </div>
                         <button 
@@ -3157,10 +3347,10 @@ export default function App() {
                       </div>
                       <h3 className="text-lg font-bold mb-1">{subject}</h3>
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">Overall Progress</span>
+                        <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Overall Progress</span>
                         <span className="text-[10px] font-bold text-emerald-600">{progress.percent}%</span>
                       </div>
-                      <div className="h-1.5 bg-zinc-100 rounded-full overflow-hidden mb-4">
+                      <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden mb-4">
                         <motion.div 
                           initial={{ width: 0 }}
                           animate={{ width: `${progress.percent}%` }}
@@ -3169,13 +3359,13 @@ export default function App() {
                       </div>
                       
                       {goal && (
-                        <div className="grid grid-cols-2 gap-4 mb-6 p-3 bg-zinc-50 rounded-xl border border-zinc-100">
+                        <div className="grid grid-cols-2 gap-4 mb-6 p-3 bg-slate-900 rounded-xl border border-slate-700">
                           <div>
-                            <p className="text-[8px] text-zinc-400 font-bold uppercase mb-1">Quizzes</p>
+                            <p className="text-[8px] text-slate-500 font-bold uppercase mb-1">Quizzes</p>
                             <p className="text-xs font-bold">{progress.quizzes} / {goal.targetQuizzes}</p>
                           </div>
                           <div>
-                            <p className="text-[8px] text-zinc-400 font-bold uppercase mb-1">Avg Score</p>
+                            <p className="text-[8px] text-slate-500 font-bold uppercase mb-1">Avg Score</p>
                             <p className="text-xs font-bold">{progress.score}% / {goal.targetScore}%</p>
                           </div>
                         </div>
@@ -3231,20 +3421,20 @@ export default function App() {
                     <div className="flex gap-2">
                       <button 
                         onClick={handleAddBuddyFromContacts}
-                        className="p-2 bg-white/10 rounded-xl hover:bg-white/20 transition-colors"
+                        className="p-2 bg-slate-800/10 rounded-xl hover:bg-slate-800/20 transition-colors"
                         title="Add from Contacts"
                       >
                         <Users size={18} />
                       </button>
-                      <button onClick={() => setShowBuddyEdit(true)} className="p-2 bg-white/10 rounded-xl hover:bg-white/20 transition-colors">
+                      <button onClick={() => setShowBuddyEdit(true)} className="p-2 bg-slate-800/10 rounded-xl hover:bg-slate-800/20 transition-colors">
                         <SettingsIcon size={18} />
                       </button>
                     </div>
                   </div>
                     
                     <div className="space-y-6 mb-8">
-                      <div className="bg-white/5 rounded-2xl p-4">
-                        <p className="text-zinc-100 italic text-sm mb-4">
+                      <div className="bg-slate-800/5 rounded-2xl p-4">
+                        <p className="text-slate-100 italic text-sm mb-4">
                           {isBuddyLoading ? "Ace is thinking..." : `"${buddyMessage.message}"`}
                         </p>
                         {!isBuddyLoading && buddyMessage.suggestions && buddyMessage.suggestions.length > 0 && (
@@ -3258,7 +3448,7 @@ export default function App() {
                                   setChatInitialMessage(suggestion);
                                   setIsChatOpen(true);
                                 }}
-                                className="px-3 py-1 bg-white/10 hover:bg-white/20 rounded-full text-[10px] text-zinc-100 transition-colors"
+                                className="px-3 py-1 bg-slate-800/10 hover:bg-slate-800/20 rounded-full text-[10px] text-slate-100 transition-colors"
                               >
                                 {suggestion}
                               </button>
@@ -3309,19 +3499,19 @@ export default function App() {
                       {profile?.buddyType !== 'AI' && (
                         <div className="grid grid-cols-1 gap-4">
                           <div className="flex justify-between items-center text-xs">
-                            <span className="text-zinc-400">Listening Rate</span>
+                            <span className="text-slate-500">Listening Rate</span>
                             <div className="flex gap-1">
                               {[1, 2, 3, 4, 5].map(n => (
-                                <div key={n} className={`w-2 h-2 rounded-full ${n <= (profile?.buddyRating || 0) ? 'bg-emerald-500' : 'bg-white/10'}`} />
+                                <div key={n} className={`w-2 h-2 rounded-full ${n <= (profile?.buddyRating || 0) ? 'bg-emerald-500' : 'bg-slate-800/10'}`} />
                               ))}
                             </div>
                           </div>
                           <div className="flex justify-between items-center text-xs">
-                            <span className="text-zinc-400">Picks Calls</span>
+                            <span className="text-slate-500">Picks Calls</span>
                             <span className={profile?.buddyAlwaysPicksCalls ? 'text-emerald-400' : 'text-red-400'}>{profile?.buddyAlwaysPicksCalls ? 'Always' : 'Sometimes'}</span>
                           </div>
                           <div className="flex justify-between items-center text-xs">
-                            <span className="text-zinc-400">Cares about studies</span>
+                            <span className="text-slate-500">Cares about studies</span>
                             <span className={profile?.buddyCaresAboutStudies ? 'text-emerald-400' : 'text-red-400'}>{profile?.buddyCaresAboutStudies ? 'Yes' : 'No'}</span>
                           </div>
                         </div>
@@ -3366,10 +3556,10 @@ export default function App() {
                 </Card>
 
                 <div className="space-y-6">
-                  <h4 className="text-sm font-bold text-zinc-400 uppercase tracking-widest">Study Buddies</h4>
+                  <h4 className="text-sm font-bold text-slate-500 uppercase tracking-widest">Study Buddies</h4>
                   <div className="space-y-3">
                     {friends.length === 0 ? (
-                      <p className="text-xs text-zinc-500 italic">No buddies yet. Invite some friends!</p>
+                      <p className="text-xs text-slate-400 italic">No buddies yet. Invite some friends!</p>
                     ) : (
                       friends.map((f: any) => {
                         const otherId = f.userIds.find((id: string) => id !== user.uid);
@@ -3423,14 +3613,14 @@ export default function App() {
                 ].map((ach, idx) => (
                   <Card key={idx} className={`flex flex-col items-center text-center p-6 ${!ach.earned && 'opacity-50 grayscale'}`}>
                     <div className={`w-12 h-12 rounded-2xl mb-4 flex items-center justify-center ${
-                      ach.color === 'amber' ? 'bg-amber-50 text-amber-600' :
-                      ach.color === 'violet' ? 'bg-violet-50 text-violet-600' :
-                      ach.color === 'emerald' ? 'bg-emerald-50 text-emerald-600' : 'bg-zinc-50 text-zinc-600'
+                      ach.color === 'amber' ? 'bg-amber-500/10 text-amber-600' :
+                      ach.color === 'violet' ? 'bg-violet-500/10 text-violet-600' :
+                      ach.color === 'emerald' ? 'bg-emerald-500/10 text-emerald-600' : 'bg-slate-900 text-slate-300'
                     }`}>
                       <ach.icon size={24} />
                     </div>
                     <h4 className="font-bold text-sm mb-1">{ach.title}</h4>
-                    <p className="text-[10px] text-zinc-500">{ach.desc}</p>
+                    <p className="text-[10px] text-slate-400">{ach.desc}</p>
                     {ach.earned && <div className="mt-3 text-[8px] font-black text-emerald-600 uppercase tracking-widest">Unlocked</div>}
                   </Card>
                 ))}
@@ -3454,10 +3644,10 @@ export default function App() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-6">
                   <section>
-                    <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-widest mb-4">Profile</h3>
+                    <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-4">Profile</h3>
                     <Card className="space-y-4">
                       <div>
-                        <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">Display Name</label>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Display Name</label>
                         <div className="flex gap-2">
                           <input 
                             type="text" 
@@ -3477,7 +3667,7 @@ export default function App() {
                                 }
                               }
                             }}
-                            className="flex-1 px-3 py-1.5 border border-zinc-100 rounded-xl text-xs focus:outline-none focus:border-emerald-600"
+                            className="flex-1 px-3 py-1.5 border border-slate-700 rounded-xl text-xs focus:outline-none focus:border-emerald-600"
                           />
                         </div>
                       </div>
@@ -3485,11 +3675,11 @@ export default function App() {
                   </section>
 
                   <section>
-                    <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-widest mb-4">My Subjects</h3>
+                    <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-4">My Subjects</h3>
                     <Card className="space-y-4">
                       <div className="flex flex-wrap gap-2">
                         {profile?.subjects?.map(s => (
-                          <div key={s} className="px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-xl text-xs font-bold flex items-center gap-2">
+                          <div key={s} className="px-3 py-1.5 bg-emerald-500/10 text-emerald-700 rounded-xl text-xs font-bold flex items-center gap-2">
                             {s}
                             <button onClick={() => handleRemoveSubject(s)} className="hover:text-emerald-900"><X size={12} /></button>
                           </div>
@@ -3501,7 +3691,7 @@ export default function App() {
                           placeholder="New subject..."
                           value={newSubject}
                           onChange={(e) => setNewSubject(e.target.value)}
-                          className="flex-1 px-3 py-1.5 border border-zinc-100 rounded-xl text-xs focus:outline-none focus:border-emerald-600"
+                          className="flex-1 px-3 py-1.5 border border-slate-700 rounded-xl text-xs focus:outline-none focus:border-emerald-600"
                         />
                         <Button 
                           variant="secondary" 
@@ -3516,11 +3706,11 @@ export default function App() {
                   </section>
 
                   <section>
-                    <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-widest mb-4">Notifications</h3>
+                    <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-4">Notifications</h3>
                     <Card className="flex items-center justify-between">
                       <div>
                         <p className="text-sm font-bold">Study Reminders</p>
-                        <p className="text-xs text-zinc-500">Get notified 15 minutes before study blocks</p>
+                        <p className="text-xs text-slate-400">Get notified 15 minutes before study blocks</p>
                       </div>
                       <Button 
                         variant={notificationPermission === 'granted' ? 'ghost' : 'secondary'} 
@@ -3534,10 +3724,10 @@ export default function App() {
                   </section>
 
                   <section>
-                    <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-widest mb-4">Study Window</h3>
+                    <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-4">Study Window</h3>
                     <Card className="grid grid-cols-2 gap-4">
                       <div>
-                        <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">Start Time</p>
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Start Time</p>
                         <input 
                           type="time" 
                           value={profile?.studyStartTime || '08:00'}
@@ -3559,7 +3749,7 @@ export default function App() {
                         />
                       </div>
                       <div>
-                        <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">End Time</p>
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">End Time</p>
                         <input 
                           type="time" 
                           value={profile?.studyEndTime || '20:00'}
@@ -3586,69 +3776,85 @@ export default function App() {
 
                 <div className="space-y-6">
                   <section>
-                    <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                    <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
                       <Accessibility size={16} /> Accessibility (PWD Support)
                     </h3>
                     <Card className="space-y-4">
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="text-xs font-bold">High Contrast</p>
-                          <p className="text-[10px] text-zinc-500">Increase visual clarity</p>
+                          <p className="text-[10px] text-slate-400">Increase visual clarity</p>
                         </div>
                         <button 
                           onClick={() => setAccessibilitySettings(prev => ({ ...prev, highContrast: !prev.highContrast }))}
-                          className={`w-10 h-5 rounded-full relative transition-colors ${accessibilitySettings.highContrast ? 'bg-emerald-600' : 'bg-zinc-200'}`}
+                          className={`w-10 h-5 rounded-full relative transition-colors ${accessibilitySettings.highContrast ? 'bg-emerald-600' : 'bg-slate-700'}`}
                         >
-                          <div className={`absolute top-1 w-3 h-3 bg-white rounded-full shadow-sm transition-all ${accessibilitySettings.highContrast ? 'right-1' : 'left-1'}`} />
+                          <div className={`absolute top-1 w-3 h-3 bg-slate-800 rounded-full shadow-sm transition-all ${accessibilitySettings.highContrast ? 'right-1' : 'left-1'}`} />
                         </button>
                       </div>
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="text-xs font-bold">Large Text</p>
-                          <p className="text-[10px] text-zinc-500">Make everything easier to read</p>
+                          <p className="text-[10px] text-slate-400">Make everything easier to read</p>
                         </div>
                         <button 
                           onClick={() => setAccessibilitySettings(prev => ({ ...prev, largeText: !prev.largeText }))}
-                          className={`w-10 h-5 rounded-full relative transition-colors ${accessibilitySettings.largeText ? 'bg-emerald-600' : 'bg-zinc-200'}`}
+                          className={`w-10 h-5 rounded-full relative transition-colors ${accessibilitySettings.largeText ? 'bg-emerald-600' : 'bg-slate-700'}`}
                         >
-                          <div className={`absolute top-1 w-3 h-3 bg-white rounded-full shadow-sm transition-all ${accessibilitySettings.largeText ? 'right-1' : 'left-1'}`} />
+                          <div className={`absolute top-1 w-3 h-3 bg-slate-800 rounded-full shadow-sm transition-all ${accessibilitySettings.largeText ? 'right-1' : 'left-1'}`} />
                         </button>
                       </div>
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="text-xs font-bold">Voice Assistance</p>
-                          <p className="text-[10px] text-zinc-500">Enable screen reader features</p>
+                          <p className="text-[10px] text-slate-400">Enable screen reader features</p>
                         </div>
                         <button 
                           onClick={() => setAccessibilitySettings(prev => ({ ...prev, voiceAssistance: !prev.voiceAssistance }))}
-                          className={`w-10 h-5 rounded-full relative transition-colors ${accessibilitySettings.voiceAssistance ? 'bg-emerald-600' : 'bg-zinc-200'}`}
+                          className={`w-10 h-5 rounded-full relative transition-colors ${accessibilitySettings.voiceAssistance ? 'bg-emerald-600' : 'bg-slate-700'}`}
                         >
-                          <div className={`absolute top-1 w-3 h-3 bg-white rounded-full shadow-sm transition-all ${accessibilitySettings.voiceAssistance ? 'right-1' : 'left-1'}`} />
+                          <div className={`absolute top-1 w-3 h-3 bg-slate-800 rounded-full shadow-sm transition-all ${accessibilitySettings.voiceAssistance ? 'right-1' : 'left-1'}`} />
                         </button>
                       </div>
                     </Card>
                   </section>
 
                   <section>
-                    <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-widest mb-4">Account</h3>
+                    <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-4">Account</h3>
                     <Card className="space-y-4">
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="text-xs font-bold">Email Notifications</p>
-                          <p className="text-[10px] text-zinc-500">Daily reminders and buddy alerts</p>
+                          <p className="text-[10px] text-slate-400">Daily reminders and buddy alerts</p>
                         </div>
-                        <div className="w-10 h-5 bg-emerald-600 rounded-full relative">
-                          <div className="absolute right-1 top-1 w-3 h-3 bg-white rounded-full shadow-sm" />
-                        </div>
+                        <button 
+                          onClick={async () => {
+                            if (!profile || !user) return;
+                            const newVal = !(profile.emailNotifications ?? true);
+                            try {
+                              await updateDoc(doc(db, 'users', user.uid), { emailNotifications: newVal });
+                              setProfile({ ...profile, emailNotifications: newVal });
+                              setToast({ title: 'Success', message: `Email notifications turned ${newVal ? 'on' : 'off'}.`, type: 'success' });
+                            } catch (e) {
+                              setToast({ title: 'Error', message: 'Failed to update preferences.', type: 'error' });
+                            }
+                          }}
+                          className={`w-10 h-5 rounded-full relative transition-colors ${profile?.emailNotifications ?? true ? 'bg-emerald-600' : 'bg-slate-700'}`}
+                        >
+                          <div className={`absolute top-1 w-3 h-3 bg-slate-800 rounded-full shadow-sm transition-all ${profile?.emailNotifications ?? true ? 'right-1' : 'left-1'}`} />
+                        </button>
                       </div>
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="text-xs font-bold">Public Profile</p>
-                          <p className="text-[10px] text-zinc-500">Allow friends to find you</p>
+                          <p className="text-[10px] text-slate-400">View what others see</p>
                         </div>
-                        <div className="w-10 h-5 bg-zinc-200 rounded-full relative">
-                          <div className="absolute left-1 top-1 w-3 h-3 bg-white rounded-full shadow-sm" />
-                        </div>
+                        <button 
+                          onClick={() => setShowPublicProfile(true)}
+                          className="flex items-center justify-center p-2 text-slate-400 hover:text-emerald-500 hover:bg-slate-700/50 rounded-xl transition-colors"
+                        >
+                          <ChevronRight size={16} />
+                        </button>
                       </div>
                       {isPasswordUser && (
                         <div className="pt-2 border-t border-zinc-50">
@@ -3709,16 +3915,16 @@ export default function App() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 max-w-md mx-auto bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-6"
+            className="fixed inset-0 w-full bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-6"
           >
             <Card className="max-w-md w-full p-8">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-2xl font-bold">About Study Buddy</h3>
-                <button onClick={() => setShowAbout(false)} className="text-zinc-400 hover:text-zinc-600">
+                <button onClick={() => setShowAbout(false)} className="text-slate-500 hover:text-slate-300">
                   <X size={24} />
                 </button>
               </div>
-              <div className="space-y-4 text-zinc-600">
+              <div className="space-y-4 text-slate-300">
                 <p>Study Buddy is your AI-powered academic companion designed to help you stay focused, organized, and balanced.</p>
                 <p>Features include:</p>
                 <ul className="list-disc pl-5 space-y-1">
@@ -3728,7 +3934,7 @@ export default function App() {
                   <li>Practice quizzes for your subjects</li>
                   <li>Accessibility support for all students</li>
                 </ul>
-                <p className="text-sm pt-4 border-t border-zinc-100">Version 1.0.0 • Designed for African Students</p>
+                <p className="text-sm pt-4 border-t border-slate-700">Version 1.0.0 • Designed for African Students</p>
               </div>
               <Button className="w-full mt-8" onClick={() => setShowAbout(false)}>Close</Button>
             </Card>
@@ -3739,32 +3945,32 @@ export default function App() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 max-w-md mx-auto bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-6"
+            className="fixed inset-0 w-full bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-6"
           >
             <Card className="max-w-sm w-full p-8">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-bold">Set Goal: {showGoalModal}</h3>
-                <button onClick={() => setShowGoalModal(null)} className="text-zinc-400 hover:text-zinc-600">
+                <button onClick={() => setShowGoalModal(null)} className="text-slate-500 hover:text-slate-300">
                   <X size={20} />
                 </button>
               </div>
               <div className="space-y-6">
                 <div>
-                  <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-2">Target Quizzes</label>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Target Quizzes</label>
                   <input 
                     type="number" 
                     value={goalData.targetQuizzes}
                     onChange={(e) => setGoalData({ ...goalData, targetQuizzes: parseInt(e.target.value) })}
-                    className="w-full p-3 rounded-xl border border-zinc-100 focus:outline-none focus:border-emerald-600"
+                    className="w-full p-3 rounded-xl border border-slate-700 focus:outline-none focus:border-emerald-600"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-2">Target Score (%)</label>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Target Score (%)</label>
                   <input 
                     type="number" 
                     value={goalData.targetScore}
                     onChange={(e) => setGoalData({ ...goalData, targetScore: parseInt(e.target.value) })}
-                    className="w-full p-3 rounded-xl border border-zinc-100 focus:outline-none focus:border-emerald-600"
+                    className="w-full p-3 rounded-xl border border-slate-700 focus:outline-none focus:border-emerald-600"
                   />
                 </div>
                 <div className="flex gap-3 pt-4">
@@ -3784,7 +3990,7 @@ export default function App() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 max-w-md mx-auto bg-zinc-900 z-[150] flex flex-col items-center justify-center p-6 text-white"
+            className="fixed inset-0 w-full bg-zinc-900 z-[150] flex flex-col items-center justify-center p-6 text-white"
           >
             <div className="absolute top-6 sm:top-10 left-6 sm:left-10 flex items-center gap-3">
               <Sparkles className="text-emerald-400 sm:w-6 sm:h-6" size={16} />
@@ -3793,7 +3999,7 @@ export default function App() {
             
             <button 
               onClick={() => { setIsFocusMode(false); setIsTimerRunning(false); }}
-              className="absolute top-6 sm:top-10 right-6 sm:right-10 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors"
+              className="absolute top-6 sm:top-10 right-6 sm:right-10 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-slate-800/10 flex items-center justify-center hover:bg-slate-800/20 transition-colors"
             >
               <X size={16} className="sm:w-5 sm:h-5" />
             </button>
@@ -3806,25 +4012,25 @@ export default function App() {
               >
                 {Math.floor(timer / 60)}:{String(timer % 60).padStart(2, '0')}
               </motion.div>
-              <p className="text-zinc-400 uppercase tracking-[0.2em] sm:tracking-[0.3em] font-bold text-[8px] sm:text-sm mb-6 sm:mb-12">Deep Work Session</p>
+              <p className="text-slate-500 uppercase tracking-[0.2em] sm:tracking-[0.3em] font-bold text-[8px] sm:text-sm mb-6 sm:mb-12">Deep Work Session</p>
               
               <div className="flex flex-col gap-3 w-full">
                 <Button 
-                  className="w-full py-3 sm:py-4 bg-white text-zinc-900 hover:bg-zinc-100 text-sm sm:text-base" 
+                  className="w-full py-3 sm:py-4 bg-slate-800 text-white hover:bg-slate-800 text-sm sm:text-base" 
                   onClick={() => setIsTimerRunning(!isTimerRunning)}
                 >
                   {isTimerRunning ? 'Pause' : 'Resume'}
                 </Button>
                 <Button 
                   variant="secondary" 
-                  className="w-full py-3 sm:py-4 bg-white/10 border-white/20 text-white hover:bg-white/20 text-sm sm:text-base"
+                  className="w-full py-3 sm:py-4 bg-slate-800/10 border-white/20 text-white hover:bg-slate-800/20 text-sm sm:text-base"
                   onClick={completeSession}
                 >
                   Stop & Save
                 </Button>
                 <Button 
                   variant="ghost" 
-                  className="w-full py-3 sm:py-4 text-zinc-400 hover:text-white text-sm sm:text-base"
+                  className="w-full py-3 sm:py-4 text-slate-500 hover:text-white text-sm sm:text-base"
                   onClick={() => { setIsFocusMode(false); setIsTimerRunning(false); }}
                 >
                   Cancel Session
@@ -3832,7 +4038,7 @@ export default function App() {
               </div>
             </div>
 
-            <div className="absolute bottom-10 text-center text-zinc-500 text-xs max-w-xs">
+            <div className="absolute bottom-10 text-center text-slate-400 text-xs max-w-xs">
               "The secret of getting ahead is getting started." — Mark Twain
             </div>
           </motion.div>
@@ -3885,14 +4091,14 @@ export default function App() {
 }
 
 const LogoutConfirmModal = ({ onConfirm, onCancel }: any) => (
-  <div className="fixed inset-0 max-w-md mx-auto bg-black/40 backdrop-blur-sm z-[150] flex items-center justify-center p-4">
+  <div className="fixed inset-0 w-full bg-black/40 backdrop-blur-sm z-[150] flex items-center justify-center p-4">
     <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="max-w-sm w-full">
       <Card className="p-8 text-center">
         <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
           <LogOut size={32} />
         </div>
         <h3 className="text-xl font-bold mb-2">Sign Out?</h3>
-        <p className="text-zinc-500 text-sm mb-8">Are you sure you want to sign out of your account?</p>
+        <p className="text-slate-400 text-sm mb-8">Are you sure you want to sign out of your account?</p>
         <div className="flex gap-3">
           <Button variant="secondary" className="flex-1" onClick={onCancel}>Cancel</Button>
           <Button variant="danger" className="flex-1" onClick={onConfirm}>Sign Out</Button>
@@ -3933,12 +4139,12 @@ const ForgotPasswordModal = ({ onClose, initialEmail = '' }: any) => {
   };
 
   return (
-    <div className="fixed inset-0 max-w-md mx-auto bg-black/40 backdrop-blur-sm z-[150] flex items-center justify-center p-4">
+    <div className="fixed inset-0 w-full bg-black/40 backdrop-blur-sm z-[150] flex items-center justify-center p-4">
       <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="max-w-md w-full">
         <Card className="p-8">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl font-bold">Reset Password</h2>
-            <button onClick={onClose} className="text-zinc-400 hover:text-zinc-600"><X size={20} /></button>
+            <button onClick={onClose} className="text-slate-500 hover:text-slate-300"><X size={20} /></button>
           </div>
 
           {success ? (
@@ -3947,12 +4153,12 @@ const ForgotPasswordModal = ({ onClose, initialEmail = '' }: any) => {
                 <CheckCircle size={32} />
               </div>
               <p className="font-bold text-emerald-700">Reset Email Sent!</p>
-              <p className="text-sm text-zinc-600 mb-6">We've sent a secure link to <b>{email}</b>. Follow the link to reset your password.</p>
+              <p className="text-sm text-slate-300 mb-6">We've sent a secure link to <b>{email}</b>. Follow the link to reset your password.</p>
               <Button variant="secondary" onClick={onClose} className="w-full">Back to Sign In</Button>
             </div>
           ) : (
             <form onSubmit={handleReset} className="space-y-4">
-              <p className="text-sm text-zinc-600 mb-4">Enter your email address and we'll send you a secure link to reset your password.</p>
+              <p className="text-sm text-slate-300 mb-4">Enter your email address and we'll send you a secure link to reset your password.</p>
               {error && (
                 <div className="p-3 bg-red-50 border border-red-100 rounded-xl text-red-600 text-xs font-medium">
                   {error}
@@ -3960,13 +4166,13 @@ const ForgotPasswordModal = ({ onClose, initialEmail = '' }: any) => {
               )}
               
               <div>
-                <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Email Address</label>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Email Address</label>
                 <input 
                   type="email" 
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="name@example.com"
-                  className="w-full p-3 rounded-xl border border-zinc-100 text-sm focus:outline-none focus:border-emerald-600"
+                  className="w-full p-3 rounded-xl border border-slate-700 text-sm focus:outline-none focus:border-emerald-600"
                   required
                 />
               </div>
@@ -3978,7 +4184,7 @@ const ForgotPasswordModal = ({ onClose, initialEmail = '' }: any) => {
               <button 
                 type="button"
                 onClick={onClose}
-                className="w-full text-sm text-zinc-500 font-medium hover:text-emerald-600 transition-colors"
+                className="w-full text-sm text-slate-400 font-medium hover:text-emerald-600 transition-colors"
               >
                 Back to Sign In
               </button>
@@ -4042,7 +4248,7 @@ const ChangePasswordModal = ({ onClose, onForgotPassword }: { onClose: () => voi
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 max-w-md mx-auto bg-black/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4"
+      className="fixed inset-0 w-full bg-black/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4"
     >
       <motion.div 
         initial={{ scale: 0.9, opacity: 0 }}
@@ -4053,7 +4259,7 @@ const ChangePasswordModal = ({ onClose, onForgotPassword }: { onClose: () => voi
         <Card className="p-8">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl font-bold">Change Password</h2>
-            <button onClick={onClose} className="text-zinc-400 hover:text-zinc-600"><X size={20} /></button>
+            <button onClick={onClose} className="text-slate-500 hover:text-slate-300"><X size={20} /></button>
           </div>
 
           {success ? (
@@ -4062,7 +4268,7 @@ const ChangePasswordModal = ({ onClose, onForgotPassword }: { onClose: () => voi
                 <CheckCircle size={32} />
               </div>
               <p className="font-bold text-emerald-700">Password Updated!</p>
-              <p className="text-sm text-zinc-500">Closing in a moment...</p>
+              <p className="text-sm text-slate-400">Closing in a moment...</p>
             </div>
           ) : resetSent ? (
             <div className="text-center py-8">
@@ -4070,7 +4276,7 @@ const ChangePasswordModal = ({ onClose, onForgotPassword }: { onClose: () => voi
                 <Sparkles size={32} />
               </div>
               <p className="font-bold text-emerald-700">Reset Email Sent!</p>
-              <p className="text-sm text-zinc-500 mb-6">Check your inbox to reset your password.</p>
+              <p className="text-sm text-slate-400 mb-6">Check your inbox to reset your password.</p>
               <Button variant="secondary" onClick={onClose} className="w-full">Close</Button>
             </div>
           ) : (
@@ -4083,7 +4289,7 @@ const ChangePasswordModal = ({ onClose, onForgotPassword }: { onClose: () => voi
               
               <div>
                 <div className="flex justify-between items-center mb-2">
-                  <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Current Password</label>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest">Current Password</label>
                   <button 
                     type="button"
                     onClick={onForgotPassword}
@@ -4097,31 +4303,31 @@ const ChangePasswordModal = ({ onClose, onForgotPassword }: { onClose: () => voi
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full p-3 rounded-xl border border-zinc-100 text-sm focus:outline-none focus:border-emerald-600"
+                  className="w-full p-3 rounded-xl border border-slate-700 text-sm focus:outline-none focus:border-emerald-600"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-2">New Password</label>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">New Password</label>
                 <input 
                   type="password" 
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full p-3 rounded-xl border border-zinc-100 text-sm focus:outline-none focus:border-emerald-600"
+                  className="w-full p-3 rounded-xl border border-slate-700 text-sm focus:outline-none focus:border-emerald-600"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-2">Confirm New Password</label>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Confirm New Password</label>
                 <input 
                   type="password" 
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full p-3 rounded-xl border border-zinc-100 text-sm focus:outline-none focus:border-emerald-600"
+                  className="w-full p-3 rounded-xl border border-slate-700 text-sm focus:outline-none focus:border-emerald-600"
                   required
                 />
               </div>
@@ -4151,7 +4357,7 @@ function BottomNav({ activeTab, onNavigate }: any) {
   ];
 
   return (
-    <div className="fixed bottom-0 max-w-md mx-auto w-full h-20 bg-bg-card/80 backdrop-blur-xl border-t border-slate-800 flex items-center justify-around px-6 z-50">
+    <div className="fixed bottom-0 w-full lg:max-w-7xl mx-auto h-20 bg-bg-card/80 backdrop-blur-xl border-t border-slate-800 flex items-center justify-around px-6 z-50">
       {tabs.map(tab => (
         <button 
           key={tab.id}
@@ -4167,7 +4373,7 @@ function BottomNav({ activeTab, onNavigate }: any) {
 }
 
 const WelcomeScreen = ({ onLogin, onSignUp }: any) => (
-  <div className="max-w-md mx-auto min-h-screen flex flex-col items-center justify-center p-8 bg-bg-dark text-center relative shadow-2xl border-x border-zinc-800 overflow-x-hidden">
+  <div className="w-full lg:max-w-7xl mx-auto min-h-screen flex flex-col items-center justify-center p-8 bg-bg-dark text-center relative shadow-2xl border-x border-zinc-800 overflow-x-hidden">
     <motion.div 
       initial={{ scale: 0.8, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
@@ -4192,8 +4398,8 @@ const LoginScreen = ({ onBack, onLogin, isSignUp }: any) => {
   const [password, setPassword] = useState('');
 
   return (
-    <div className="max-w-md mx-auto min-h-screen flex flex-col p-8 bg-bg-dark relative shadow-2xl border-x border-zinc-800 overflow-x-hidden">
-      <button onClick={onBack} className="mb-12 self-start p-2 hover:bg-white/5 rounded-xl transition-colors">
+    <div className="w-full lg:max-w-7xl mx-auto min-h-screen flex flex-col p-8 bg-bg-dark relative shadow-2xl border-x border-zinc-800 overflow-x-hidden">
+      <button onClick={onBack} className="mb-12 self-start p-2 hover:bg-slate-800/5 rounded-xl transition-colors">
         <ArrowLeft size={24} />
       </button>
       
@@ -4245,23 +4451,23 @@ const LoginScreen = ({ onBack, onLogin, isSignUp }: any) => {
 
 function FriendCard({ name, status, online, onInvite }: any) {
   return (
-    <div className="flex items-center gap-4 p-4 bg-white border border-zinc-100 rounded-2xl">
+    <div className="flex items-center gap-4 p-4 bg-slate-800 border border-slate-700 rounded-2xl">
       <div className="relative">
-        <div className="w-10 h-10 rounded-full bg-zinc-100 flex items-center justify-center text-zinc-500 font-bold">
+        <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-slate-400 font-bold">
           {name[0]}
         </div>
         {online && <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full" />}
       </div>
       <div className="flex-1">
         <p className="font-bold text-sm">{name}</p>
-        <p className="text-xs text-zinc-500">{status}</p>
+        <p className="text-xs text-slate-400">{status}</p>
       </div>
       {online ? (
         <button className="text-emerald-600 hover:text-emerald-700 transition-colors">
           <Zap size={18} />
         </button>
       ) : (
-        <button onClick={onInvite} className="text-zinc-400 hover:text-emerald-600 transition-colors" title="Invite Friend">
+        <button onClick={onInvite} className="text-slate-500 hover:text-emerald-600 transition-colors" title="Invite Friend">
           <Plus size={18} />
         </button>
       )}
@@ -4272,15 +4478,15 @@ function FriendCard({ name, status, online, onInvite }: any) {
 function WellnessCard({ icon: Icon, title, desc, time }: any) {
   return (
     <Card className="flex items-start gap-4 p-4">
-      <div className="w-10 h-10 rounded-xl bg-zinc-50 flex items-center justify-center text-zinc-400">
+      <div className="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center text-slate-500">
         <Icon size={20} />
       </div>
       <div>
         <div className="flex justify-between items-center mb-1">
           <h4 className="font-bold text-sm">{title}</h4>
-          <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{time}</span>
+          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{time}</span>
         </div>
-        <p className="text-xs text-zinc-500 leading-relaxed">{desc}</p>
+        <p className="text-xs text-slate-400 leading-relaxed">{desc}</p>
       </div>
     </Card>
   );
@@ -4376,15 +4582,15 @@ function Onboarding({ profile, onComplete, user }: any) {
   };
 
   return (
-    <div className="max-w-md mx-auto min-h-screen bg-zinc-50 flex flex-col items-center justify-start p-4 sm:p-6 overflow-y-auto relative shadow-2xl border-x border-zinc-200 overflow-x-hidden">
+    <div className="w-full lg:max-w-7xl mx-auto min-h-screen bg-slate-900 flex flex-col items-center justify-start p-4 sm:p-6 overflow-y-auto relative shadow-2xl border-x border-slate-600 overflow-x-hidden">
       <Card className="max-w-md w-full p-6 sm:p-8 my-auto">
         <div className="flex justify-between items-center mb-8">
           <div className="flex gap-1">
             {[1, 2, 3, 4, 5].map(s => (
-              <div key={s} className={`h-1 w-6 rounded-full ${step >= s ? 'bg-emerald-600' : 'bg-zinc-100'}`} />
+              <div key={s} className={`h-1 w-6 rounded-full ${step >= s ? 'bg-emerald-600' : 'bg-slate-800'}`} />
             ))}
           </div>
-          <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Step {step} of 5</span>
+          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Step {step} of 5</span>
         </div>
 
         {error && (
@@ -4396,32 +4602,32 @@ function Onboarding({ profile, onComplete, user }: any) {
         {step === 1 && (
           <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
             <h2 className="text-xl sm:text-2xl font-bold mb-2">Study Details</h2>
-            <p className="text-sm text-zinc-600 mb-8">Tell us about your current academic focus.</p>
+            <p className="text-sm text-slate-300 mb-8">Tell us about your current academic focus.</p>
             
             <div className="space-y-6">
               <div>
-                <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3">Your Name</label>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Your Name</label>
                 <input 
                   type="text"
                   value={data.displayName || user.displayName || user.email?.split('@')[0] || ''}
                   onChange={(e) => setData({ ...data, displayName: e.target.value })}
                   placeholder="Enter your name"
-                  className="w-full p-4 rounded-2xl border border-zinc-100 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600 transition-all"
+                  className="w-full p-4 rounded-2xl border border-slate-700 bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600 transition-all"
                 />
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3">Education Level</label>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Education Level</label>
                 <div className="grid grid-cols-2 gap-3">
                   <button 
                     onClick={() => setData({ ...data, educationLevel: 'Secondary' })}
-                    className={`p-3 sm:p-4 rounded-2xl border text-sm text-center transition-all ${data.educationLevel === 'Secondary' ? 'border-emerald-600 bg-emerald-50 text-emerald-700 font-bold' : 'border-zinc-100 bg-white'}`}
+                    className={`p-3 sm:p-4 rounded-2xl border text-sm text-center transition-all ${data.educationLevel === 'Secondary' ? 'border-emerald-600 bg-emerald-500/10 text-emerald-700 font-bold' : 'border-slate-700 bg-slate-800'}`}
                   >
                     Secondary
                   </button>
                   <button 
                     onClick={() => setData({ ...data, educationLevel: 'University' })}
-                    className={`p-3 sm:p-4 rounded-2xl border text-sm text-center transition-all ${data.educationLevel === 'University' ? 'border-emerald-600 bg-emerald-50 text-emerald-700 font-bold' : 'border-zinc-100 bg-white'}`}
+                    className={`p-3 sm:p-4 rounded-2xl border text-sm text-center transition-all ${data.educationLevel === 'University' ? 'border-emerald-600 bg-emerald-500/10 text-emerald-700 font-bold' : 'border-slate-700 bg-slate-800'}`}
                   >
                     University
                   </button>
@@ -4429,7 +4635,7 @@ function Onboarding({ profile, onComplete, user }: any) {
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3">Target Exams</label>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Target Exams</label>
                 <div className="flex flex-wrap gap-2">
                   {['JAMB', 'WAEC', 'NECO', 'Post-UTME', 'Finals', 'SAT', 'IELTS'].map(exam => (
                     <button 
@@ -4438,7 +4644,7 @@ function Onboarding({ profile, onComplete, user }: any) {
                         const exams = data.targetExams || [];
                         setData({ ...data, targetExams: exams.includes(exam) ? exams.filter(e => e !== exam) : [...exams, exam] });
                       }}
-                      className={`px-3 py-1.5 rounded-xl border text-xs transition-all ${data.targetExams?.includes(exam) ? 'border-emerald-600 bg-emerald-600 text-white font-bold' : 'border-zinc-100 bg-white'}`}
+                      className={`px-3 py-1.5 rounded-xl border text-xs transition-all ${data.targetExams?.includes(exam) ? 'border-emerald-600 bg-emerald-600 text-white font-bold' : 'border-slate-700 bg-slate-800'}`}
                     >
                       {exam}
                     </button>
@@ -4452,7 +4658,7 @@ function Onboarding({ profile, onComplete, user }: any) {
         {step === 2 && (
           <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
             <h2 className="text-xl sm:text-2xl font-bold mb-2">Your Subjects</h2>
-            <p className="text-sm text-zinc-500 mb-8">Select the subjects you are currently offering.</p>
+            <p className="text-sm text-slate-400 mb-8">Select the subjects you are currently offering.</p>
             
             <div className="space-y-4">
               <div className="flex flex-wrap gap-2">
@@ -4463,13 +4669,13 @@ function Onboarding({ profile, onComplete, user }: any) {
                       const subs = data.subjects || [];
                       setData({ ...data, subjects: subs.includes(subject) ? subs.filter(s => s !== subject) : [...subs, subject] });
                     }}
-                    className={`px-3 py-1.5 rounded-xl border text-xs transition-all ${data.subjects?.includes(subject) ? 'border-emerald-600 bg-emerald-600 text-white font-bold' : 'border-zinc-100 bg-white'}`}
+                    className={`px-3 py-1.5 rounded-xl border text-xs transition-all ${data.subjects?.includes(subject) ? 'border-emerald-600 bg-emerald-600 text-white font-bold' : 'border-slate-700 bg-slate-800'}`}
                   >
                     {subject}
                   </button>
                 ))}
               </div>
-              <p className="text-[10px] text-zinc-500 italic">You can add more subjects later in settings.</p>
+              <p className="text-[10px] text-slate-400 italic">You can add more subjects later in settings.</p>
             </div>
           </motion.div>
         )}
@@ -4477,24 +4683,24 @@ function Onboarding({ profile, onComplete, user }: any) {
         {step === 3 && (
           <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
             <h2 className="text-xl sm:text-2xl font-bold mb-2">Strengths & Weaknesses</h2>
-            <p className="text-sm text-zinc-500 mb-8">We'll allocate more time to subjects you find challenging.</p>
+            <p className="text-sm text-slate-400 mb-8">We'll allocate more time to subjects you find challenging.</p>
             
             <div className="space-y-6">
               <div>
-                <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3">I'm good at...</label>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">I'm good at...</label>
                 <input 
                   type="text" 
                   placeholder="e.g., Mathematics, Physics"
-                  className="w-full p-3 sm:p-4 rounded-2xl border border-zinc-100 focus:outline-none focus:border-emerald-600 text-sm"
+                  className="w-full p-3 sm:p-4 rounded-2xl border border-slate-700 focus:outline-none focus:border-emerald-600 text-sm"
                   onBlur={(e) => setData({ ...data, strengths: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })}
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-3">I struggle with...</label>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">I struggle with...</label>
                 <input 
                   type="text" 
                   placeholder="e.g., Chemistry, Biology"
-                  className="w-full p-3 sm:p-4 rounded-2xl border border-zinc-100 focus:outline-none focus:border-emerald-600 text-sm"
+                  className="w-full p-3 sm:p-4 rounded-2xl border border-slate-700 focus:outline-none focus:border-emerald-600 text-sm"
                   onBlur={(e) => setData({ ...data, weaknesses: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })}
                 />
               </div>
@@ -4505,7 +4711,7 @@ function Onboarding({ profile, onComplete, user }: any) {
         {step === 4 && (
           <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
             <h2 className="text-xl sm:text-2xl font-bold mb-2">Choose Your Buddy</h2>
-            <p className="text-sm text-zinc-500 mb-8">Who will help keep you accountable?</p>
+            <p className="text-sm text-slate-400 mb-8">Who will help keep you accountable?</p>
             
             <div className="space-y-6">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -4518,7 +4724,7 @@ function Onboarding({ profile, onComplete, user }: any) {
                   <button 
                     key={type.id}
                     onClick={() => setData({ ...data, buddyType: type.id as any })}
-                    className={`p-3 rounded-2xl border flex flex-col items-center gap-2 transition-all ${data.buddyType === type.id ? 'border-emerald-600 bg-emerald-50 text-emerald-700 font-bold' : 'border-zinc-100 bg-white'}`}
+                    className={`p-3 rounded-2xl border flex flex-col items-center gap-2 transition-all ${data.buddyType === type.id ? 'border-emerald-600 bg-emerald-500/10 text-emerald-700 font-bold' : 'border-slate-700 bg-slate-800'}`}
                   >
                     <type.icon size={20} />
                     <span className="text-[10px]">{type.label}</span>
@@ -4529,24 +4735,24 @@ function Onboarding({ profile, onComplete, user }: any) {
               {data.buddyType !== 'AI' && (
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Buddy Name</label>
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Buddy Name</label>
                     <input 
                       type="text" 
                       placeholder="Enter name"
-                      className="w-full p-3 rounded-xl border border-zinc-100 text-sm"
+                      className="w-full p-3 rounded-xl border border-slate-700 text-sm"
                       onChange={(e) => setData({ ...data, buddyName: e.target.value })}
                     />
                   </div>
                   
                   <div className="space-y-4 pt-2">
                     <div>
-                      <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">How much do you listen to them? (1-5)</label>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">How much do you listen to them? (1-5)</label>
                       <div className="flex justify-between px-2">
                         {[1, 2, 3, 4, 5].map(num => (
                           <button 
                             key={num}
                             onClick={() => setData({ ...data, buddyRating: num })}
-                            className={`w-8 h-8 rounded-full flex items-center justify-center text-xs border ${data.buddyRating === num ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-zinc-400 border-zinc-100'}`}
+                            className={`w-8 h-8 rounded-full flex items-center justify-center text-xs border ${data.buddyRating === num ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-slate-800 text-slate-500 border-slate-700'}`}
                           >
                             {num}
                           </button>
@@ -4555,17 +4761,17 @@ function Onboarding({ profile, onComplete, user }: any) {
                     </div>
 
                     <div className="flex items-center justify-between">
-                      <span className="text-xs text-zinc-600">Always pick their calls?</span>
+                      <span className="text-xs text-slate-300">Always pick their calls?</span>
                       <div className="flex gap-2">
                         <button 
                           onClick={() => setData({ ...data, buddyAlwaysPicksCalls: true })}
-                          className={`px-3 py-1 rounded-lg text-[10px] border ${data.buddyAlwaysPicksCalls ? 'bg-emerald-600 text-white' : 'bg-white text-zinc-400'}`}
+                          className={`px-3 py-1 rounded-lg text-[10px] border ${data.buddyAlwaysPicksCalls ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-500'}`}
                         >
                           Yes
                         </button>
                         <button 
                           onClick={() => setData({ ...data, buddyAlwaysPicksCalls: false })}
-                          className={`px-3 py-1 rounded-lg text-[10px] border ${!data.buddyAlwaysPicksCalls ? 'bg-emerald-600 text-white' : 'bg-white text-zinc-400'}`}
+                          className={`px-3 py-1 rounded-lg text-[10px] border ${!data.buddyAlwaysPicksCalls ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-500'}`}
                         >
                           No
                         </button>
@@ -4573,17 +4779,17 @@ function Onboarding({ profile, onComplete, user }: any) {
                     </div>
 
                     <div className="flex items-center justify-between">
-                      <span className="text-xs text-zinc-600">Do they care about your studies?</span>
+                      <span className="text-xs text-slate-300">Do they care about your studies?</span>
                       <div className="flex gap-2">
                         <button 
                           onClick={() => setData({ ...data, buddyCaresAboutStudies: true })}
-                          className={`px-3 py-1 rounded-lg text-[10px] border ${data.buddyCaresAboutStudies ? 'bg-emerald-600 text-white' : 'bg-white text-zinc-400'}`}
+                          className={`px-3 py-1 rounded-lg text-[10px] border ${data.buddyCaresAboutStudies ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-500'}`}
                         >
                           Yes
                         </button>
                         <button 
                           onClick={() => setData({ ...data, buddyCaresAboutStudies: false })}
-                          className={`px-3 py-1 rounded-lg text-[10px] border ${!data.buddyCaresAboutStudies ? 'bg-emerald-600 text-white' : 'bg-white text-zinc-400'}`}
+                          className={`px-3 py-1 rounded-lg text-[10px] border ${!data.buddyCaresAboutStudies ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-500'}`}
                         >
                           No
                         </button>
@@ -4599,34 +4805,34 @@ function Onboarding({ profile, onComplete, user }: any) {
         {step === 5 && (
           <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
             <h2 className="text-xl sm:text-2xl font-bold mb-2">Study Schedule</h2>
-            <p className="text-sm text-zinc-600 mb-8">Set your daily study window and commitment.</p>
+            <p className="text-sm text-slate-300 mb-8">Set your daily study window and commitment.</p>
             
             <div className="space-y-8">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Start Time</label>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Start Time</label>
                   <input 
                     type="time" 
                     value={data.studyStartTime}
                     onChange={(e) => setData({ ...data, studyStartTime: e.target.value })}
-                    className="w-full p-3 rounded-xl border border-zinc-100 text-sm"
+                    className="w-full p-3 rounded-xl border border-slate-700 text-sm"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">End Time</label>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">End Time</label>
                   <input 
                     type="time" 
                     value={data.studyEndTime}
                     onChange={(e) => setData({ ...data, studyEndTime: e.target.value })}
-                    className="w-full p-3 rounded-xl border border-zinc-100 text-sm"
+                    className="w-full p-3 rounded-xl border border-slate-700 text-sm"
                   />
                 </div>
               </div>
 
               <div className="text-center">
-                <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Daily Hours</p>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Daily Hours</p>
                 <span className="text-5xl font-bold text-emerald-600">{data.availableHours}</span>
-                <span className="text-lg font-bold text-zinc-500 ml-2">hours</span>
+                <span className="text-lg font-bold text-slate-400 ml-2">hours</span>
                 <input 
                   type="range" 
                   min="1" 
@@ -4637,8 +4843,8 @@ function Onboarding({ profile, onComplete, user }: any) {
                 />
               </div>
 
-              <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100 flex items-center gap-4">
-                <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-emerald-600 shadow-sm shrink-0">
+              <div className="p-4 bg-emerald-500/10 rounded-2xl border border-emerald-100 flex items-center gap-4">
+                <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-emerald-600 shadow-sm shrink-0">
                   <Sparkles size={20} />
                 </div>
                 <p className="text-[10px] text-emerald-800 leading-relaxed">

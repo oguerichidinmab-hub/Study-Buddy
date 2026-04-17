@@ -16,7 +16,7 @@
 
 @layer base {
   body {
-    @apply bg-zinc-50 text-zinc-900 font-sans;
+    @apply bg-slate-900 text-white font-sans;
   }
   
   .high-contrast {
@@ -62,7 +62,7 @@
 }
 
 .btn-secondary {
-  @apply bg-white text-zinc-900 border border-zinc-200 font-bold py-3 px-6 rounded-2xl transition-all active:scale-95;
+  @apply bg-slate-800 text-white border border-slate-700 font-bold py-3 px-6 rounded-2xl transition-all active:scale-95 hover:bg-slate-700;
 }
 
 .card-dark {
