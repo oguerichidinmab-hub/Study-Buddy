@@ -24,7 +24,7 @@ import { io, Socket } from "socket.io-client";
 
 // Initialize socket
 const socket: Socket = io({
-  transports: ["websocket"]
+  transports: ["polling", "websocket"]
 });
 socket.on("connect_error", (err) => {
   console.error("Socket connection error:", err.message);
@@ -94,7 +94,7 @@ const Card = ({ children, className = '', id, onClick }: any) => (
   <div 
     id={id} 
     onClick={onClick}
-    className={`bg-bg-card border border-slate-800 rounded-[2rem] p-6 shadow-xl ${onClick ? 'cursor-pointer active:scale-[0.98] transition-transform' : ''} ${className}`}
+    className={`bg-white border border-zinc-100 rounded-[2rem] p-6 shadow-sm ${onClick ? 'cursor-pointer active:scale-[0.98] transition-transform' : ''} ${className}`}
   >
     {children}
   </div>
@@ -404,7 +404,7 @@ const QuizBattle = ({ onAction }: any) => {
         
         <div className="text-6xl font-black tracking-tighter">12 - 9</div>
         
-        <Button className="w-full py-5 text-lg" icon={Zap}>Join Battle</Button>
+        <Button className="w-full py-3.5 text-base" icon={Zap}>Join Battle</Button>
       </Card>
     </div>
   );
@@ -959,7 +959,7 @@ const Settings = ({ user, onAction, onLogout }: any) => {
           </Card>
         </div>
 
-        <Button variant="danger" className="w-full py-4 mt-8" onClick={() => onLogout()}>
+        <Button variant="danger" className="w-full py-3.5 mt-8" onClick={() => onLogout()}>
           Log Out
         </Button>
       </div>
@@ -1328,7 +1328,7 @@ const ExamPractice = ({ onCancel, onComplete, setToast }: { onCancel: () => void
             <div className="p-6 bg-emerald-50 rounded-3xl border border-emerald-100">
               <h4 className="font-bold text-emerald-900 mb-2">Ready to start?</h4>
               <p className="text-sm text-emerald-700 mb-4">You'll be practicing {selectedSubject} for {selectedExamType}. Ace will pick 10 questions for you.</p>
-              <Button className="w-full py-4 text-lg" onClick={startPractice} icon={Play}>
+              <Button className="w-full py-3.5 text-base" onClick={startPractice} icon={Play}>
                 Start Practice Session
               </Button>
             </div>
@@ -1687,13 +1687,7 @@ export default function App() {
   // --- Auth & Profile ---
 
   useEffect(() => {
-    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
-      console.error('Unhandled Promise Rejection:', event.reason);
-      // Optionally show a toast or error boundary
-    };
-
-    window.addEventListener('unhandledrejection', handleUnhandledRejection);
-    return () => window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+    // Global error handlers can be added here if needed
   }, []);
 
   useEffect(() => {
@@ -3091,7 +3085,7 @@ export default function App() {
                         </div>
                       </div>
                     </div>
-                    <Button variant="secondary" className="bg-white text-violet-600 border-none hover:bg-violet-50 px-8 py-4 text-lg font-bold shadow-lg" icon={Play}>
+                    <Button variant="secondary" className="bg-white text-violet-600 border-none hover:bg-violet-50 px-6 py-3.5 text-base font-bold shadow-lg" icon={Play}>
                       Start Practice
                     </Button>
                   </div>
@@ -4187,8 +4181,8 @@ const WelcomeScreen = ({ onLogin, onSignUp }: any) => (
     </motion.div>
     
     <div className="w-full max-w-xs space-y-4">
-      <Button className="w-full py-5 text-lg" onClick={onSignUp}>Sign Up</Button>
-      <Button variant="secondary" className="w-full py-5 text-lg" onClick={onLogin}>Log In</Button>
+      <Button className="w-full py-3.5 text-base" onClick={onSignUp}>Sign Up</Button>
+      <Button variant="secondary" className="w-full py-3.5 text-base" onClick={onLogin}>Log In</Button>
     </div>
   </div>
 );
@@ -4235,7 +4229,7 @@ const LoginScreen = ({ onBack, onLogin, isSignUp }: any) => {
           </div>
         </div>
         
-        <Button className="w-full py-5 text-lg mt-8" onClick={() => onLogin(email, password)}>
+        <Button className="w-full py-3.5 text-base mt-8" onClick={() => onLogin(email, password)}>
           {isSignUp ? 'Sign Up' : 'Login'}
         </Button>
         
