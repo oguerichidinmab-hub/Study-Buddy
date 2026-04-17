@@ -241,7 +241,7 @@ const Quiz = ({ subject, educationLevel, targetExams, cachedQuestions, onCacheQu
   );
 };
 
-const Friends = ({ user, friends, friendProfiles, onAddFriend, onChat }: any) => {
+const Friends = ({ user, friends, friendProfiles, onAddFriend, onChat, onAction }: any) => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [friendEmail, setFriendEmail] = useState('');
 
@@ -260,7 +260,12 @@ const Friends = ({ user, friends, friendProfiles, onAddFriend, onChat }: any) =>
   return (
     <div className="flex-1 overflow-y-auto pb-32 p-6">
       <div className="flex justify-between items-center mb-8">
-        <h2 className="text-3xl font-black">Friends</h2>
+        <div className="flex items-center gap-4">
+          <button onClick={() => onAction('back')} className="p-2 -ml-2 hover:bg-slate-800/10 rounded-xl">
+            <ArrowLeft size={24} />
+          </button>
+          <h2 className="text-3xl font-black">Friends</h2>
+        </div>
         <button className="w-10 h-10 bg-bg-card border border-slate-800 rounded-xl flex items-center justify-center">
           <Users size={20} />
         </button>
@@ -337,12 +342,20 @@ const Friends = ({ user, friends, friendProfiles, onAddFriend, onChat }: any) =>
   );
 };
 
-const StudyGroups = ({ onAction }: any) => {
+const StudyGroups = ({ onAction, setToast }: any) => {
   const groups = [
     { name: 'Physics Group', members: 12, icon: '⚛️', color: 'blue' },
     { name: 'Exam Prep', members: 45, icon: '📝', color: 'violet' },
     { name: 'Math Squad', members: 8, icon: '📐', color: 'emerald' },
   ];
+
+  const handleJoin = (groupName: string) => {
+    setToast({
+      title: 'Joined Group!',
+      message: `You are now a member of ${groupName}`,
+      type: 'success'
+    });
+  };
 
   return (
     <div className="flex-1 overflow-y-auto pb-32 p-6">
@@ -362,11 +375,27 @@ const StudyGroups = ({ onAction }: any) => {
               <h3 className="font-bold">{group.name}</h3>
               <p className="text-xs text-text-secondary">{group.members} Members</p>
             </div>
-            <Button variant="secondary" className="px-4 py-2 text-xs">Join</Button>
+            <Button 
+              variant="secondary" 
+              className="px-4 py-2 text-xs"
+              onClick={() => handleJoin(group.name)}
+            >
+              Join
+            </Button>
           </Card>
         ))}
       </div>
-      <Button className="w-full mt-8" icon={Plus}>Create Group</Button>
+      <Button 
+        className="w-full mt-8" 
+        icon={Plus}
+        onClick={() => setToast({
+          title: 'Coming Soon',
+          message: 'Group creation will be available in the next update!',
+          type: 'info'
+        })}
+      >
+        Create Group
+      </Button>
     </div>
   );
 };
@@ -1405,12 +1434,15 @@ const BuddyChatModal = ({ user, profile, onClose, initialMessage, isAI: propIsAI
 
     const handleReceiveMessage = (data: any) => {
       if (data.senderId !== user.uid) {
-        setMessages(prev => [...prev, { 
-          role: 'buddy', 
-          text: data.text, 
-          timestamp: data.timestamp,
-          senderId: data.senderId
-        }]);
+        setMessages(prev => {
+          const updated = prev.map(m => m.role === 'user' ? { ...m, status: 'read' } : m);
+          return [...updated, { 
+            role: 'buddy', 
+            text: data.text, 
+            timestamp: data.timestamp,
+            senderId: data.senderId
+          }];
+        });
       }
     };
 
@@ -1443,9 +1475,12 @@ const BuddyChatModal = ({ user, profile, onClose, initialMessage, isAI: propIsAI
 
   useEffect(() => {
     if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      scrollRef.current.scrollTo({
+        top: scrollRef.current.scrollHeight,
+        behavior: 'smooth'
+      });
     }
-  }, [messages]);
+  }, [messages, loading]);
 
   const handleSend = async (customMsg?: string | React.MouseEvent) => {
     const isString = typeof customMsg === 'string';
@@ -1460,7 +1495,12 @@ const BuddyChatModal = ({ user, profile, onClose, initialMessage, isAI: propIsAI
 
     if (!isString) {
       setInput('');
-      setMessages(prev => [...prev, { role: 'user', text: msgToSend, timestamp, senderId: user.uid }]);
+      setMessages(prev => [...prev, { role: 'user', text: msgToSend, timestamp, senderId: user.uid, status: 'sent' }]);
+      
+      // Simulate delivered after 500ms
+      setTimeout(() => {
+        setMessages(prev => prev.map(m => (m.timestamp === timestamp && m.role === 'user') ? { ...m, status: 'delivered' } : m));
+      }, 500);
     }
 
     // Send via socket for real-time
@@ -1478,22 +1518,27 @@ const BuddyChatModal = ({ user, profile, onClose, initialMessage, isAI: propIsAI
     if (isAI && chatRef.current) {
       setLoading(true);
       try {
-        const stream = await chatRef.current.sendMessageStream(msgToSend);
+        const stream = await chatRef.current.sendMessageStream({ message: msgToSend });
         
-        // Add an empty message for the model that we will update
+        // Mark previous messages as read when buddy starts responding
+        setMessages(prev => prev.map(m => m.role === 'user' ? { ...m, status: 'read' } : m));
+        
+        // Add an empty message for the model
         setMessages(prev => [...prev, { role: 'model', text: '', timestamp: Date.now() }]);
         
         let fullText = '';
         for await (const chunk of stream) {
           const chunkText = chunk.text || '';
+          if (!chunkText) continue;
           fullText += chunkText;
+          
           setMessages(prev => {
-            const newMessages = [...prev];
-            const lastMsg = newMessages[newMessages.length - 1];
-            if (lastMsg && lastMsg.role === 'model') {
-              lastMsg.text = fullText;
+            if (prev[prev.length - 1].role === 'model') {
+              const next = [...prev];
+              next[next.length - 1] = { ...next[next.length - 1], text: fullText };
+              return next;
             }
-            return newMessages;
+            return prev;
           });
         }
       } catch (error) {
@@ -1524,7 +1569,9 @@ const BuddyChatModal = ({ user, profile, onClose, initialMessage, isAI: propIsAI
             </div>
             <div>
               <h3 className="font-bold text-sm">{buddyName}</h3>
-              <p className="text-[10px] text-emerald-100 opacity-80">{isAI ? 'Online' : 'Active Buddy'}</p>
+              <p className="text-[10px] text-emerald-100 opacity-80">
+                {loading ? 'typing...' : (isAI ? 'Online' : 'Active Buddy')}
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-4">
@@ -1544,8 +1591,8 @@ const BuddyChatModal = ({ user, profile, onClose, initialMessage, isAI: propIsAI
               <div key={i} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
                 <div className={`max-w-[85%] px-3 py-2 rounded-lg text-sm shadow-sm relative ${
                   isMe 
-                    ? 'bg-[#DCF8C6] text-white rounded-tr-none' 
-                    : 'bg-slate-800 text-white rounded-tl-none'
+                    ? 'bg-[#DCF8C6] text-slate-800 rounded-tr-none' 
+                    : 'bg-white text-slate-800 rounded-tl-none'
                 }`}>
                   <p className="pr-12">{msg.text}</p>
                   <div className="absolute bottom-1 right-2 flex items-center gap-1">
@@ -1554,8 +1601,25 @@ const BuddyChatModal = ({ user, profile, onClose, initialMessage, isAI: propIsAI
                     </span>
                     {isMe && (
                       <div className="flex -space-x-1">
-                        <Check size={10} className="text-blue-400" />
-                        <Check size={10} className="text-blue-400" />
+                        {msg.status === 'sent' && <Check size={10} className="text-slate-400" />}
+                        {msg.status === 'delivered' && (
+                          <>
+                            <Check size={10} className="text-slate-400" />
+                            <Check size={10} className="text-slate-400" />
+                          </>
+                        )}
+                        {msg.status === 'read' && (
+                          <>
+                            <Check size={10} className="text-blue-400" />
+                            <Check size={10} className="text-blue-400" />
+                          </>
+                        )}
+                        {!msg.status && (
+                          <>
+                            <Check size={10} className="text-blue-400" />
+                            <Check size={10} className="text-blue-400" />
+                          </>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1565,12 +1629,13 @@ const BuddyChatModal = ({ user, profile, onClose, initialMessage, isAI: propIsAI
           })}
           {loading && (
             <div className="flex justify-start">
-              <div className="bg-slate-800 px-3 py-2 rounded-lg rounded-tl-none shadow-sm">
+              <div className="bg-white px-3 py-2 rounded-lg rounded-tl-none shadow-sm flex items-center gap-2">
                 <div className="flex gap-1">
-                  <div className="w-1.5 h-1.5 bg-zinc-300 rounded-full animate-bounce" />
-                  <div className="w-1.5 h-1.5 bg-zinc-300 rounded-full animate-bounce [animation-delay:0.2s]" />
-                  <div className="w-1.5 h-1.5 bg-zinc-300 rounded-full animate-bounce [animation-delay:0.4s]" />
+                  <div className="w-1.5 h-1.5 bg-brand-primary rounded-full animate-bounce" />
+                  <div className="w-1.5 h-1.5 bg-brand-primary rounded-full animate-bounce [animation-delay:0.2s]" />
+                  <div className="w-1.5 h-1.5 bg-brand-primary rounded-full animate-bounce [animation-delay:0.4s]" />
                 </div>
+                <span className="text-[10px] text-slate-400 font-medium">Ace is typing...</span>
               </div>
             </div>
           )}
@@ -2837,21 +2902,27 @@ export default function App() {
                     <button onClick={() => navigate('groups')} className="text-xs font-bold text-emerald-600 hover:underline">Join More</button>
                   </div>
                   <div className="space-y-4 flex-1">
-                    <div className="flex items-center gap-3 p-3 bg-slate-900 rounded-2xl border border-slate-700">
+                    <div 
+                      onClick={() => navigate('groups')}
+                      className="flex items-center gap-3 p-3 bg-slate-900 rounded-2xl border border-slate-700 hover:border-emerald-500 transition-colors cursor-pointer"
+                    >
                       <div className="w-10 h-10 rounded-xl bg-violet-100 text-violet-600 flex items-center justify-center text-xl">⚛️</div>
                       <div className="flex-1">
                         <p className="text-sm font-bold">Physics Squad</p>
                         <p className="text-[10px] text-slate-400">12 members online</p>
                       </div>
-                      <button className="p-2 text-slate-500 hover:text-emerald-600"><ChevronRight size={16} /></button>
+                      <div className="p-2 text-slate-500"><ChevronRight size={16} /></div>
                     </div>
-                    <div className="flex items-center gap-3 p-3 bg-slate-900 rounded-2xl border border-slate-700">
+                    <div 
+                      onClick={() => navigate('groups')}
+                      className="flex items-center gap-3 p-3 bg-slate-900 rounded-2xl border border-slate-700 hover:border-emerald-500 transition-colors cursor-pointer"
+                    >
                       <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center text-xl">📐</div>
                       <div className="flex-1">
                         <p className="text-sm font-bold">Math Masters</p>
                         <p className="text-[10px] text-slate-400">8 members online</p>
                       </div>
-                      <button className="p-2 text-slate-500 hover:text-emerald-600"><ChevronRight size={16} /></button>
+                      <div className="p-2 text-slate-500"><ChevronRight size={16} /></div>
                     </div>
                   </div>
                   <Button variant="secondary" className="w-full mt-4" onClick={() => navigate('leaderboard')} icon={TrendingUp}>
@@ -3051,7 +3122,7 @@ export default function App() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
             >
-              <StudyGroups />
+              <StudyGroups onAction={handleBack} setToast={setToast} />
             </motion.div>
           )}
 
@@ -3062,7 +3133,7 @@ export default function App() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
             >
-              <Leaderboard />
+              <Leaderboard onAction={handleBack} />
             </motion.div>
           )}
 
@@ -3073,7 +3144,7 @@ export default function App() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
             >
-              <Achievements />
+              <Achievements onAction={handleBack} />
             </motion.div>
           )}
 
@@ -3095,7 +3166,7 @@ export default function App() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
             >
-              <StudyTips />
+              <StudyTips onAction={handleBack} />
             </motion.div>
           )}
 
@@ -3106,7 +3177,7 @@ export default function App() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
             >
-              <StudyChat />
+              <StudyChat onAction={handleBack} />
             </motion.div>
           )}
 
@@ -3122,6 +3193,7 @@ export default function App() {
                 friends={friends} 
                 friendProfiles={friendProfiles} 
                 onAddFriend={handleAddFriend} 
+                onAction={handleBack}
                 onChat={(friend: any) => {
                   setChatType('User');
                   setSelectedBuddy({ uid: friend.id, displayName: friend.name });
